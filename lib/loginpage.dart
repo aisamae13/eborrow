@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'registerpage.dart';
+import 'forgotpasswordpage.dart';
 import 'bottom_nav.dart';
 
 class LoginPage extends StatefulWidget {
@@ -145,8 +146,11 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     TextButton(
                       onPressed: () {
-                        // Handle forgot password
-                        debugPrint('Forgot password pressed');
+                       Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const ForgotPasswordPage()),
+                        );
                       },
                       style: TextButton.styleFrom(
                         padding: EdgeInsets.zero,

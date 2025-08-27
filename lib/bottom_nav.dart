@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'homepage.dart';
 import 'catalogpage.dart';
 import 'scanqr.dart';
+import 'historypage.dart';
 
 
 class BottomNav extends StatefulWidget {
@@ -28,8 +29,7 @@ class _BottomNavState extends State<BottomNav> {
       HomePage(onNavigate: _onItemTapped),
       const CatalogPage(),
       const ScanQRPage(),
-      // A placeholder widget for the History page.
-      const Center(child: Text('History Page')),
+      const HistoryPage(),
     ];
   }
 
