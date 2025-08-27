@@ -86,46 +86,51 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Updated welcome card widget to match the new design.
   Widget _buildWelcomeCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      margin: const EdgeInsets.only(top: 20), // Add top margin to separate it from the app bar
-      decoration: BoxDecoration(
-        color: const Color(0xFF2B326B),// Slightly lighter dark blue
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(20),
+    margin: const EdgeInsets.only(top: 20), // Add top margin to separate it from the app bar
+    decoration: BoxDecoration(
+      // Updated to use a LinearGradient for a smoother look
+      gradient: const LinearGradient(
+        colors: [Color(0xFF2B326B), Color(0xFF686A9E)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
       ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Welcome, Alyssa!',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFFFFC107), // Yellow
-            ),
+      borderRadius: BorderRadius.circular(15),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.1),
+          blurRadius: 10,
+          offset: const Offset(0, 5),
+        ),
+      ],
+    ),
+    child: const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Welcome, Alyssa!',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFFFFC107), // Yellow
           ),
-          SizedBox(height: 8),
-          Text(
-            'Find and borrow any equipment easily',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white,
-            ),
+        ),
+        SizedBox(height: 8),
+        Text(
+          'Find and borrow any equipment easily',
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.white,
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
+
 
   // Helper method to build the header for each section.
   Widget _buildSectionHeader(String title) {
