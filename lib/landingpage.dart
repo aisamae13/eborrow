@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'loginpage.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({Key? key}) : super(key: key);
@@ -73,30 +75,33 @@ class LandingPage extends StatelessWidget {
 
                   // Get Started Button
                   SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        print('Get Started pressed');
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                      ),
-                      child: const Text(
-                        'GET STARTED',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.0,
-                          color:  Color(0xFF2E4F7A),
-                        ),
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8.0),
                       ),
                     ),
+                    child: Text(
+                  'GET STARTED',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.0,
+                    color: const Color(0xFF2E4F7A),
                   ),
+                ),
+                  ),
+                ),
 
                   const SizedBox(height: 200),
                 ],
