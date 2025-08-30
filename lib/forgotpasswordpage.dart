@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Add this import
+import 'main.dart'; // Add this import
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -9,10 +11,7 @@ class ForgotPasswordPage extends StatefulWidget {
 }
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
-  // Controller for the email text field
   final _emailController = TextEditingController();
-
-  // State to manage the loading spinner on the button
   bool _isLoading = false;
 
   @override
@@ -21,11 +20,15 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     super.dispose();
   }
 
-  // A placeholder function for handling the password reset logic
-  void _resetPassword() async {
-    if (_emailController.text.isEmpty) {
-      // You can show a SnackBar or a dialog here to inform the user
-      // that the email field cannot be empty.
+  // UPDATED: This function is now connected to Supabase
+  Future<void> _resetPassword() async {
+    if (_emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your email address.'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
 
@@ -33,17 +36,43 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       _isLoading = true;
     });
 
-    // Simulate an API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      await supabase.auth.resetPasswordForEmail(_emailController.text.trim());
 
-    setState(() {
-      _isLoading = false;
-    });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password reset link sent! Please check your email.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('An unexpected error occurred.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
 
-    // After the "reset" is complete, you could show a success message
-    // and then navigate back to the login page.
-    if (!mounted) return;
-    Navigator.of(context).pop();
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -51,8 +80,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        // The back button is automatically provided by the Scaffold,
-        // but you can customize it here if needed.
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Color(0xFF2E4F7A)),
@@ -65,8 +92,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 40),
-
-                // Forgot Password Title
                 Center(
                   child: Text(
                     'Forgot Password?',
@@ -77,10 +102,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
-                // Informational Text
                 Text(
                   'Enter the email address associated with your account to receive a password reset link.',
                   textAlign: TextAlign.center,
@@ -90,10 +112,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     color: const Color(0xFF666666),
                   ),
                 ),
-
                 const SizedBox(height: 40),
-
-                // Email Field
                 Text(
                   'Email',
                   style: GoogleFonts.poppins(
@@ -103,30 +122,27 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0E0E0),
-                    borderRadius: BorderRadius.circular(4),
+                TextField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: const Color(0xFF333333),
                   ),
-                  child: TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: const Color(0xFF333333),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.grey[200],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide.none,
                     ),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 15,
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 32),
-
-                // Send Reset Link Button
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -140,8 +156,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       ),
                     ),
                     child: _isLoading
-                        ? const CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
                           )
                         : Text(
                             'Send Reset Link',

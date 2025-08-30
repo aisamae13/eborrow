@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'landingpage.dart';
+import 'main.dart';
 
 class HomePage extends StatefulWidget {
   final Function(int) onNavigate;
@@ -10,6 +13,86 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  String? _userName;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  // UPDATED: This function is now smarter about finding the user's name
+  void _loadUserData() {
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      // For users who signed up with email, we look for 'first_name'
+      String? firstName = user.userMetadata?['first_name'];
+
+      // For users who signed in with Google, the name is often in 'full_name'
+      String? fullName = user.userMetadata?['full_name'];
+
+      // We prioritize the first name, but fall back to the full name
+      final name = firstName ?? fullName;
+
+      if (name != null) {
+        // We only want the first part of the name if it's a full name
+        setState(() {
+          _userName = name.split(' ')[0];
+        });
+      }
+    }
+  }
+
+  Future<void> _showSignOutConfirmationDialog() async {
+    final bool? shouldSignOut = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Sign Out'),
+          content: const Text('Are you sure you want to sign out?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(false),
+            ),
+            TextButton(
+              child: const Text(
+                'Sign Out',
+                style: TextStyle(color: Colors.red),
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldSignOut == true) {
+      // IMPORTANT: Capture the Navigator before the async operation.
+      // This avoids using 'BuildContext' across async gaps.
+      final navigator = Navigator.of(context);
+
+      try {
+        await supabase.auth.signOut();
+
+        // After successful sign out, perform the navigation.
+        await navigator.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LandingPage()),
+          (route) => false,
+        );
+      } on AuthException catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.message),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -25,17 +108,19 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         backgroundColor: const Color(0xFF2B326B),
-        actions: const [
-          Icon(Icons.notifications, color: Colors.white),
-          SizedBox(width: 16), // Spacing for the notification icon
+        actions: [
+          // ADD THIS IconButton FOR SIGN OUT
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            onPressed:
+                _showSignOutConfirmationDialog, // Call the new function here
+          ),
+          const SizedBox(width: 8), // Adjust spacing if needed
         ],
         // The yellow line is now part of the app bar's bottom property.
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4.0),
-          child: Container(
-            color: const Color(0xFFFFC107),
-            height: 4.0,
-          ),
+          child: Container(color: const Color(0xFFFFC107), height: 4.0),
         ),
       ),
       // The rest of the page body
@@ -45,8 +130,8 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // No more Stack or Transform.translate, just a normal welcome card.
-              _buildWelcomeCard(),
+              // This now passes the user's name to the welcome card
+              _buildWelcomeCard(_userName),
 
               const SizedBox(height: 24),
               // Quick Actions Section
@@ -86,51 +171,49 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildWelcomeCard() {
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(20),
-    margin: const EdgeInsets.only(top: 20), // Add top margin to separate it from the app bar
-    decoration: BoxDecoration(
-      // Updated to use a LinearGradient for a smoother look
-      gradient: const LinearGradient(
-        colors: [Color(0xFF2B326B), Color(0xFF686A9E)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      borderRadius: BorderRadius.circular(15),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.1),
-          blurRadius: 10,
-          offset: const Offset(0, 5),
-        ),
-      ],
-    ),
-    child: const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Welcome, Alyssa!',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFFFFC107), // Yellow
-          ),
-        ),
-        SizedBox(height: 8),
-        Text(
-          'Find and borrow any equipment easily',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.white,
-          ),
-        ),
-      ],
-    ),
-  );
-}
+  Widget _buildWelcomeCard(String? userName) {
+    // Display the user's name if available, otherwise show a default message
+    final displayName = userName ?? 'Welcome!';
 
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(top: 20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2B326B), Color(0xFF686A9E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Welcome, $displayName!', // This line is now dynamic
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFFFFC107),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Find and borrow any equipment easily',
+            style: TextStyle(fontSize: 16, color: Colors.white),
+          ),
+        ],
+      ),
+    );
+  }
 
   // Helper method to build the header for each section.
   Widget _buildSectionHeader(String title) {
@@ -196,9 +279,10 @@ class _HomePageState extends State<HomePage> {
         children: [
           Icon(icon, size: 32, color: iconColor),
           const SizedBox(height: 12),
-          Text(label,
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           Text(subtitle, style: TextStyle(color: Colors.grey[700])),
         ],
       ),
@@ -312,10 +396,14 @@ class _HomePageState extends State<HomePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(subtitle,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -328,9 +416,10 @@ class _HomePageState extends State<HomePage> {
             child: Text(
               status,
               style: TextStyle(
-                  color: statusColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12),
+                color: statusColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
