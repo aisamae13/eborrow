@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'main.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({super.key});
@@ -8,77 +10,55 @@ class CatalogPage extends StatefulWidget {
 }
 
 class _CatalogPageState extends State<CatalogPage> {
+  late Future<List<Equipment>> _equipmentFuture;
   String selectedCategory = 'All';
   String searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
-  // Sample equipment data
-  final List<Equipment> equipmentList = [
-    Equipment(
-      name: 'MacBook Pro 13"',
-      category: 'Laptops',
-      availability: 'Available',
-      specs: 'M2 Chip, 8GB RAM, 256GB SSD',
-      imageIcon: Icons.laptop_mac,
-    ),
-    Equipment(
-      name: 'Dell XPS 15',
-      category: 'Laptops',
-      availability: 'Borrowed',
-      specs: 'Intel i7, 16GB RAM, 512GB SSD',
-      imageIcon: Icons.laptop_windows,
-    ),
-    Equipment(
-      name: 'Epson Projector',
-      category: 'Projectors',
-      availability: 'Available',
-      specs: '3LCD, 3300 lumens, WXGA',
-      imageIcon: Icons.video_camera_front,
-    ),
-    Equipment(
-      name: 'HDMI Cable 2m',
-      category: 'Cables',
-      availability: 'Available',
-      specs: 'High-speed HDMI 2.1',
-      imageIcon: Icons.cable,
-    ),
-    Equipment(
-      name: 'Sony Headphones',
-      category: 'Audio',
-      availability: 'Available',
-      specs: 'Wireless, Noise Cancelling',
-      imageIcon: Icons.headset,
-    ),
-    Equipment(
-      name: 'iPad Pro',
-      category: 'Tablets',
-      availability: 'Available',
-      specs: '11-inch, M2 chip, 128GB',
-      imageIcon: Icons.tablet_mac,
-    ),
+  @override
+  void initState() {
+    super.initState();
+    _equipmentFuture = _fetchEquipment();
+  }
+
+  Future<List<Equipment>> _fetchEquipment() async {
+    try {
+      final response = await supabase
+          .from('equipment')
+          .select('*, equipment_categories(category_name)');
+
+      final equipmentList = response.map((map) {
+        return Equipment.fromMap(map);
+      }).toList();
+
+      return equipmentList;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error fetching equipment: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+      rethrow;
+    }
+  }
+
+  List<String> get categories => [
+    'All',
+    'Laptops',
+    'Projectors',
+    'HDMI Cables',
+    'Audio',
+    'Tablets',
   ];
-
-  List<String> get categories {
-    final cats = equipmentList.map((e) => e.category).toSet().toList();
-    return ['All', ...cats];
-  }
-
-  List<Equipment> get filteredEquipment {
-    return equipmentList.where((equipment) {
-      final matchesCategory = selectedCategory == 'All' || equipment.category == selectedCategory;
-      final matchesSearch = searchQuery.isEmpty ||
-          equipment.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
-          equipment.category.toLowerCase().contains(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
-    }).toList();
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // The new App Bar matching the Home Page design.
       appBar: AppBar(
-         automaticallyImplyLeading: false,
+        automaticallyImplyLeading: false,
         title: const Text(
           'Catalog',
           style: TextStyle(
@@ -89,27 +69,19 @@ class _CatalogPageState extends State<CatalogPage> {
         ),
         backgroundColor: const Color(0xFF2B326B),
         actions: [
-          // The filter icon is moved into the App Bar actions
           IconButton(
             icon: const Icon(Icons.filter_list, color: Colors.white),
-            onPressed: () {
-              _showFilterDialog();
-            },
+            onPressed: _showFilterDialog,
           ),
-          const SizedBox(width: 16), // Spacing for the icon
+          const SizedBox(width: 16),
         ],
-        // The yellow line is now part of the app bar's bottom property.
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4.0),
-          child: Container(
-            color: const Color(0xFFFFC107),
-            height: 4.0,
-          ),
+          child: Container(color: const Color(0xFFFFC107), height: 4.0),
         ),
       ),
       body: Column(
         children: [
-          // The Search Bar and Filter Chips
           Container(
             padding: const EdgeInsets.all(16),
             color: Colors.white,
@@ -129,12 +101,13 @@ class _CatalogPageState extends State<CatalogPage> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
               ),
             ),
           ),
-
-          // Category Filter Chips
           Container(
             height: 60,
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -159,31 +132,60 @@ class _CatalogPageState extends State<CatalogPage> {
                     checkmarkColor: Colors.white,
                     labelStyle: TextStyle(
                       color: isSelected ? Colors.white : Colors.black87,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                 );
               },
             ),
           ),
-
-          // Equipment Grid
           Expanded(
-            child: filteredEquipment.isEmpty
-                ? _buildEmptyState()
-                : GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 200,
-                      childAspectRatio: 0.75,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                    ),
-                    itemCount: filteredEquipment.length,
-                    itemBuilder: (context, index) {
-                      return _buildEquipmentCard(filteredEquipment[index]);
-                    },
+            child: FutureBuilder<List<Equipment>>(
+              future: _equipmentFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Error: ${snapshot.error.toString()}'),
+                  );
+                }
+
+                final equipmentList = snapshot.data!;
+                final filteredList = equipmentList.where((equipment) {
+                  final matchesCategory =
+                      selectedCategory == 'All' ||
+                      equipment.categoryName == selectedCategory;
+                  final matchesSearch =
+                      searchQuery.isEmpty ||
+                      equipment.name.toLowerCase().contains(
+                        searchQuery.toLowerCase(),
+                      );
+                  return matchesCategory && matchesSearch;
+                }).toList();
+
+                if (filteredList.isEmpty) {
+                  return _buildEmptyState();
+                }
+
+                return GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 200,
+                    childAspectRatio: 0.75,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
                   ),
+                  itemCount: filteredList.length,
+                  itemBuilder: (context, index) {
+                    return _buildEquipmentCard(filteredList[index]);
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -201,19 +203,7 @@ class _CatalogPageState extends State<CatalogPage> {
             children: [
               ListTile(
                 title: const Text('Show Available Only'),
-                trailing: Switch(
-                  value: false,
-                  onChanged: (value) {
-                    // Implement filter logic
-                  },
-                ),
-              ),
-              ListTile(
-                title: const Text('Sort by Name'),
-                trailing: const Icon(Icons.keyboard_arrow_right),
-                onTap: () {
-                  // Implement sort logic
-                },
+                trailing: Switch(value: false, onChanged: (value) {}),
               ),
             ],
           ),
@@ -233,11 +223,7 @@ class _CatalogPageState extends State<CatalogPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.search_off,
-            size: 80,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.search_off, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No equipment found',
@@ -250,17 +236,41 @@ class _CatalogPageState extends State<CatalogPage> {
           const SizedBox(height: 8),
           Text(
             'Try adjusting your search or filter',
-            style: TextStyle(
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(color: Colors.grey[500]),
           ),
         ],
       ),
     );
   }
 
+  IconData _getIconForCategory(String categoryName) {
+    switch (categoryName) {
+      case 'Laptops':
+        return Icons.laptop_mac;
+      case 'Projectors':
+        return Icons.video_camera_front_outlined;
+      case 'HDMI Cables':
+        return Icons.cable;
+      case 'Audio':
+        return Icons.headset_outlined;
+      case 'Tablets':
+        return Icons.tablet_mac;
+      default:
+        return Icons.inventory_2_outlined;
+    }
+  }
+
   Widget _buildEquipmentCard(Equipment equipment) {
-    final isAvailable = equipment.availability == 'Available';
+    final isAvailable = equipment.status.toLowerCase() == 'available';
+    final fallbackIcon = _getIconForCategory(equipment.categoryName);
+
+    String specsString = [
+      equipment.specifications['RAM'],
+      equipment.specifications['Storage'],
+      equipment.specifications['Resolution'],
+      equipment.specifications['Length'],
+      equipment.specifications['Technology'],
+    ].where((s) => s != null).join(', ');
 
     return Container(
       decoration: BoxDecoration(
@@ -278,7 +288,6 @@ class _CatalogPageState extends State<CatalogPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Equipment Image/Icon Container
           Expanded(
             flex: 3,
             child: Container(
@@ -292,23 +301,45 @@ class _CatalogPageState extends State<CatalogPage> {
               ),
               child: Stack(
                 children: [
-                  // Equipment Icon
                   Center(
-                    child: Icon(
-                      equipment.imageIcon,
-                      size: 60,
-                      color: Colors.grey[400],
-                    ),
+                    child:
+                        (equipment.imageUrl != null &&
+                            equipment.imageUrl!.isNotEmpty)
+                        ? Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Image.network(
+                              equipment.imageUrl!,
+                              fit: BoxFit.contain,
+                              // The incorrect 'padding' property has been removed from here
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return const Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  },
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  fallbackIcon,
+                                  size: 60,
+                                  color: Colors.grey[400],
+                                );
+                              },
+                            ),
+                          )
+                        : Icon(fallbackIcon, size: 60, color: Colors.grey[400]),
                   ),
-                  // Status Badge
                   Positioned(
                     top: 12,
                     right: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: isAvailable ? Colors.green : Colors.red,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         isAvailable ? 'Available' : 'Borrowed',
@@ -324,8 +355,6 @@ class _CatalogPageState extends State<CatalogPage> {
               ),
             ),
           ),
-
-          // Equipment Details
           Expanded(
             flex: 2,
             child: Padding(
@@ -334,7 +363,6 @@ class _CatalogPageState extends State<CatalogPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Equipment Name
                   Flexible(
                     child: Text(
                       equipment.name,
@@ -347,20 +375,14 @@ class _CatalogPageState extends State<CatalogPage> {
                     ),
                   ),
                   const SizedBox(height: 4),
-
-                  // Equipment Specs
                   Flexible(
                     child: Text(
-                    equipment.specs,
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
+                      specsString,
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  ),
-
                 ],
               ),
             ),
@@ -371,19 +393,49 @@ class _CatalogPageState extends State<CatalogPage> {
   }
 }
 
-// Equipment model class
 class Equipment {
+  final int equipmentId;
   final String name;
-  final String category;
-  final String availability;
-  final String specs;
-  final IconData imageIcon;
+  final String? model;
+  final String? brand;
+  final int categoryId;
+  final String categoryName;
+  final String qrCode;
+  final String? description;
+  final Map<String, dynamic> specifications;
+  final String status;
+  final String? imageUrl;
 
   Equipment({
+    required this.equipmentId,
     required this.name,
-    required this.category,
-    required this.availability,
-    required this.specs,
-    required this.imageIcon,
+    this.model,
+    this.brand,
+    required this.categoryId,
+    required this.categoryName,
+    required this.qrCode,
+    this.description,
+    required this.specifications,
+    required this.status,
+    this.imageUrl,
   });
+
+  factory Equipment.fromMap(Map<String, dynamic> map) {
+    return Equipment(
+      equipmentId: map['equipment_id'],
+      name: map['name'],
+      model: map['model'],
+      brand: map['brand'],
+      categoryId: map['category_id'],
+      categoryName:
+          map['equipment_categories']?['category_name'] ?? 'Uncategorized',
+      qrCode: map['qr_code'],
+      description: map['description'],
+      specifications: (map['specifications'] is Map<String, dynamic>)
+          ? map['specifications']
+          : {},
+      status: map['status'],
+      imageUrl: map['image_url'],
+    );
+  }
 }
