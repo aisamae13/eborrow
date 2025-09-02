@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'landingpage.dart';
 import 'main.dart';
+import 'profile_page.dart';
+import 'models/borrow_request.dart'; // Import the new model file
 
 class HomePage extends StatefulWidget {
   final Function(int) onNavigate;
@@ -12,34 +14,129 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+// Model for our categories
+class EquipmentCategory {
+  final int id;
+  final String name;
+  int availableCount;
+  EquipmentCategory({
+    required this.id,
+    required this.name,
+    this.availableCount = 0,
+  });
+}
+
 class _HomePageState extends State<HomePage> {
   String? _userName;
+  late final Future<List<BorrowRequest>> _recentActivityFuture;
+  late final Future<List<EquipmentCategory>> _categoriesFuture;
+  bool _showStudentIdBanner = false;
+
+  Future<void> _loadUserDataAndCheckProfile() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    // Set the display name
+    final name =
+        user.userMetadata?['first_name'] ?? user.userMetadata?['full_name'];
+    if (name != null) {
+      setState(() {
+        _userName = name.split(' ')[0];
+      });
+    }
+
+    // Check if the user signed in with Google and is missing a student ID
+    final isGoogleUser = user.appMetadata['provider'] == 'google';
+    if (isGoogleUser) {
+      try {
+        final profile = await supabase
+            .from('user_profiles')
+            .select('student_id')
+            .eq('id', user.id)
+            .single();
+        final studentId = profile['student_id'];
+        if (studentId == null || studentId.isEmpty) {
+          setState(() {
+            _showStudentIdBanner = true;
+          });
+        }
+      } catch (_) {
+        // Handle cases where profile might not exist yet
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _loadUserDataAndCheckProfile(); // Use the new function here
+    _recentActivityFuture = _fetchRecentActivity();
+    _categoriesFuture = _fetchCategories();
   }
 
-  // UPDATED: This function is now smarter about finding the user's name
   void _loadUserData() {
     final user = supabase.auth.currentUser;
     if (user != null) {
-      // For users who signed up with email, we look for 'first_name'
       String? firstName = user.userMetadata?['first_name'];
-
-      // For users who signed in with Google, the name is often in 'full_name'
       String? fullName = user.userMetadata?['full_name'];
-
-      // We prioritize the first name, but fall back to the full name
       final name = firstName ?? fullName;
 
       if (name != null) {
-        // We only want the first part of the name if it's a full name
         setState(() {
           _userName = name.split(' ')[0];
         });
       }
+    }
+  }
+
+  // New function to fetch the user's last 2 borrow requests
+  Future<List<BorrowRequest>> _fetchRecentActivity() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+    try {
+      final response = await supabase
+          .from('borrow_requests')
+          .select('*, equipment(name)')
+          .eq('borrower_id', userId)
+          .order('created_at', ascending: false)
+          .limit(2);
+      return response.map((map) => BorrowRequest.fromMap(map)).toList();
+    } catch (e) {
+      // Silently fail is okay for a summary view
+      return [];
+    }
+  }
+
+  // New function to fetch categories and count available items
+  Future<List<EquipmentCategory>> _fetchCategories() async {
+    try {
+      // Fetch all categories
+      final categoriesResponse = await supabase
+          .from('equipment_categories')
+          .select();
+      final categories = categoriesResponse.map((map) {
+        return EquipmentCategory(
+          id: map['category_id'],
+          name: map['category_name'],
+        );
+      }).toList();
+
+      // Fetch all available equipment using a case-insensitive filter
+      final equipmentResponse = await supabase
+          .from('equipment')
+          .select('category_id')
+          .ilike('status', 'available'); // Changed from .eq() to .ilike()
+
+      // Count available items for each category
+      for (var category in categories) {
+        final count = equipmentResponse
+            .where((item) => item['category_id'] == category.id)
+            .length;
+        category.availableCount = count;
+      }
+      return categories;
+    } catch (e) {
+      return []; // Return empty list on error
     }
   }
 
@@ -96,7 +193,6 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Standard app bar with the desired colors and content.
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: const Text(
@@ -109,64 +205,129 @@ class _HomePageState extends State<HomePage> {
         ),
         backgroundColor: const Color(0xFF2B326B),
         actions: [
-          // ADD THIS IconButton FOR SIGN OUT
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed:
-                _showSignOutConfirmationDialog, // Call the new function here
+            icon: const Icon(Icons.person_outline, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+              );
+            },
           ),
-          const SizedBox(width: 8), // Adjust spacing if needed
+          const SizedBox(width: 8),
         ],
-        // The yellow line is now part of the app bar's bottom property.
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4.0),
           child: Container(color: const Color(0xFFFFC107), height: 4.0),
         ),
       ),
-      // The rest of the page body
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // This now passes the user's name to the welcome card
-              _buildWelcomeCard(_userName),
-
-              const SizedBox(height: 24),
-              // Quick Actions Section
-              _buildSectionHeader('Quick Actions'),
-              const SizedBox(height: 16),
-              _buildQuickActions(context),
-              const SizedBox(height: 24),
-
-              // Equipment Categories Section
-              _buildSectionHeader('Equipment Categories'),
-              const SizedBox(height: 16),
-              _buildCategoryGrid(context),
-              const SizedBox(height: 24),
-
-              // Recent Activity Section
-              _buildSectionHeader('Recent Activity'),
-              const SizedBox(height: 16),
-              _buildRecentActivityItem(
-                icon: Icons.laptop_mac,
-                title: 'MacBook Pro 13"',
-                subtitle: 'Due: Tomorrow',
-                status: 'Borrowed',
-                statusColor: Colors.orange,
+      body: Column(
+        children: [
+          // This is where the notification banner is placed.
+          // It will only be visible if _showStudentIdBanner is true.
+          if (_showStudentIdBanner)
+            MaterialBanner(
+              padding: const EdgeInsets.all(12),
+              content: const Text(
+                'Please complete your profile by adding your Student ID.',
+                style: TextStyle(color: Colors.white),
               ),
-              const SizedBox(height: 12),
-              _buildRecentActivityItem(
-                icon: Icons.cable,
-                title: 'HDMI Cable',
-                subtitle: 'Returned: Yesterday',
-                status: 'Returned',
-                statusColor: Colors.green,
+              backgroundColor: Colors.blue.shade700,
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProfilePage(),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'Go to Profile',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => setState(() => _showStudentIdBanner = false),
+                  child: const Text(
+                    'Dismiss',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+
+          // The rest of your page is wrapped in an Expanded widget
+          // to make it scrollable below the banner.
+          Expanded(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildWelcomeCard(_userName),
+                    const SizedBox(height: 24),
+                    _buildSectionHeader('Quick Actions'),
+                    const SizedBox(height: 16),
+                    _buildQuickActions(context),
+                    const SizedBox(height: 24),
+                    _buildSectionHeader('Equipment Categories'),
+                    const SizedBox(height: 16),
+                    FutureBuilder<List<EquipmentCategory>>(
+                      future: _categoriesFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        final categories = snapshot.data ?? [];
+                        return _buildCategoryGrid(context, categories);
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    _buildSectionHeader('Recent Activity'),
+                    const SizedBox(height: 16),
+                    FutureBuilder<List<BorrowRequest>>(
+                      future: _recentActivityFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        final activities = snapshot.data ?? [];
+                        if (activities.isEmpty) {
+                          return const Center(
+                            child: Text('No recent activity.'),
+                          );
+                        }
+
+                        return Column(
+                          children: activities
+                              .map(
+                                (activity) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12.0),
+                                  child: _buildRecentActivityItem(activity),
+                                ),
+                              )
+                              .toList(),
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -289,53 +450,30 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Reusable widget for the category cards.
-  Widget _buildCategoryGrid(context) {
+  // UPDATED: Now takes a list of categories
+  Widget _buildCategoryGrid(
+    BuildContext context,
+    List<EquipmentCategory> categories,
+  ) {
+    // Hardcoded colors for a consistent look
+    final colors = [Colors.blue, Colors.purple, Colors.teal, Colors.red];
+
     return Wrap(
       spacing: 16,
       runSpacing: 16,
-      children: [
-        SizedBox(
+      children: categories.map((category) {
+        final color = colors[categories.indexOf(category) % colors.length];
+        return SizedBox(
           width: (MediaQuery.of(context).size.width - 48) / 2,
           child: _buildCategoryCard(
-            icon: Icons.laptop,
-            label: 'Laptops',
-            count: '12 available',
-            color: Colors.blue.shade100,
-            iconColor: Colors.blue.shade800,
+            icon: Icons.laptop, // We can make this dynamic later
+            label: category.name,
+            count: '${category.availableCount} available',
+            color: color.shade100,
+            iconColor: color.shade800,
           ),
-        ),
-        SizedBox(
-          width: (MediaQuery.of(context).size.width - 48) / 2,
-          child: _buildCategoryCard(
-            icon: Icons.video_camera_front,
-            label: 'Projectors',
-            count: '5 available',
-            color: Colors.purple.shade100,
-            iconColor: Colors.purple.shade800,
-          ),
-        ),
-        SizedBox(
-          width: (MediaQuery.of(context).size.width - 48) / 2,
-          child: _buildCategoryCard(
-            icon: Icons.cable,
-            label: 'Cables',
-            count: '23 available',
-            color: Colors.teal.shade100,
-            iconColor: Colors.teal.shade800,
-          ),
-        ),
-        SizedBox(
-          width: (MediaQuery.of(context).size.width - 48) / 2,
-          child: _buildCategoryCard(
-            icon: Icons.headset,
-            label: 'Audio',
-            count: '9 available',
-            color: Colors.red.shade100,
-            iconColor: Colors.red.shade800,
-          ),
-        ),
-      ],
+        );
+      }).toList(),
     );
   }
 
@@ -367,13 +505,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Reusable widget for the recent activity list items.
-  Widget _buildRecentActivityItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String status,
-    required Color statusColor,
-  }) {
+  Widget _buildRecentActivityItem(BorrowRequest item) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -390,18 +522,18 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 36, color: Colors.grey[600]),
+          Icon(Icons.history_toggle_off, size: 36, color: Colors.grey[600]),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  item.equipmentName,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  subtitle,
+                  'Status: ${item.status}',
                   style: TextStyle(color: Colors.grey[600], fontSize: 12),
                 ),
               ],
@@ -410,13 +542,13 @@ class _HomePageState extends State<HomePage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.2),
+              color: item.getStatusColor().withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              status,
+              item.status,
               style: TextStyle(
-                color: statusColor,
+                color: item.getStatusColor(),
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),

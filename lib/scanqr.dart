@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'main.dart';
+import 'catalogpage.dart'; // Needed for the Equipment model
+import 'equipment_detail_page.dart';
 
 class ScanQRPage extends StatefulWidget {
   const ScanQRPage({Key? key}) : super(key: key);
@@ -49,10 +53,7 @@ class _ScanQRPageState extends State<ScanQRPage> {
         // The yellow line is now part of the app bar's bottom property.
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4.0),
-          child: Container(
-            color: const Color(0xFFFDC031),
-            height: 4.0,
-          ),
+          child: Container(color: const Color(0xFFFDC031), height: 4.0),
         ),
       ),
       body: Stack(
@@ -65,10 +66,12 @@ class _ScanQRPageState extends State<ScanQRPage> {
                 final List<Barcode> barcodes = capture.barcodes;
                 for (final barcode in barcodes) {
                   if (barcode.rawValue != null) {
+                    // Stop scanning immediately to prevent multiple detections
                     setState(() {
                       isScanning = false;
                     });
-                    _showResultDialog(barcode.rawValue!);
+                    // Call our new handler function with the scanned code
+                    _handleScan(barcode.rawValue!);
                   }
                 }
               }
@@ -93,10 +96,7 @@ class _ScanQRPageState extends State<ScanQRPage> {
                   padding: EdgeInsets.symmetric(horizontal: 20.0),
                   child: Text(
                     'Position the QR code within the frame',
-                    style: TextStyle(
-                      color: Color(0xFF888888),
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: Color(0xFF888888), fontSize: 16),
                   ),
                 ),
               ),
@@ -107,45 +107,68 @@ class _ScanQRPageState extends State<ScanQRPage> {
     );
   }
 
-  void _showResultDialog(String result) {
+  Future<void> _handleScan(String qrCode) async {
+    // Show a loading indicator while we search the database
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Scan Result'),
-          content: Text(result),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                setState(() {
-                  isScanning = true;
-                });
-              },
-              child: const Text('OK'),
-            ),
-            TextButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: result));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Copied to clipboard')),
-                );
-                Navigator.of(context).pop();
-                setState(() {
-                  isScanning = true;
-                });
-              },
-              child: const Text('Copy'),
-            ),
-          ],
-        );
-      },
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
-  }
 
-  @override
-  void dispose() {
-    cameraController.dispose();
-    super.dispose();
+    try {
+      // Search the 'equipment' table for a matching 'qr_code'
+      final response = await supabase
+          .from('equipment')
+          .select('*, equipment_categories(category_name)')
+          .eq('qr_code', qrCode)
+          .single(); // .single() expects exactly one matching row
+
+      // Dismiss the loading indicator
+      Navigator.of(context).pop();
+
+      // Convert the database response into an Equipment object
+      final equipment = Equipment.fromMap(response);
+
+      // Navigate to the detail page for the found item
+      if (mounted) {
+        // We await the result of the push, so we can re-enable scanning
+        // after the user comes back from the detail page.
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => EquipmentDetailPage(equipment: equipment),
+          ),
+        );
+      }
+    } catch (e) {
+      // If .single() finds no rows or an error occurs, it will throw an exception
+      // Dismiss the loading indicator
+      Navigator.of(context).pop();
+
+      // Show an error message to the user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Equipment not found. Please try another code.',
+            ),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      // This block runs whether the scan was successful or not.
+      // We re-enable scanning so the user can try again.
+      if (mounted) {
+        setState(() {
+          isScanning = true;
+        });
+      }
+    }
+
+    @override
+    void dispose() {
+      cameraController.dispose();
+      super.dispose();
+    }
   }
 }

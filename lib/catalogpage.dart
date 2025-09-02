@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
+import 'equipment_detail_page.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({super.key});
@@ -10,10 +12,12 @@ class CatalogPage extends StatefulWidget {
 }
 
 class _CatalogPageState extends State<CatalogPage> {
-  late Future<List<Equipment>> _equipmentFuture;
+  Future<List<Equipment>>? _equipmentFuture;
   String selectedCategory = 'All';
-  String searchQuery = '';
-  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _showAvailableOnly = false;
+  final _searchController = TextEditingController();
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -21,12 +25,28 @@ class _CatalogPageState extends State<CatalogPage> {
     _equipmentFuture = _fetchEquipment();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
   Future<List<Equipment>> _fetchEquipment() async {
     try {
-      final response = await supabase
+      var query = supabase
           .from('equipment')
           .select('*, equipment_categories(category_name)');
 
+      if (_searchQuery.isNotEmpty) {
+        query = query.ilike('name', '%$_searchQuery%');
+      }
+
+      if (_showAvailableOnly) {
+        query = query.ilike('status', 'available');
+      }
+
+      final response = await query;
       final equipmentList = response.map((map) {
         return Equipment.fromMap(map);
       }).toList();
@@ -43,6 +63,22 @@ class _CatalogPageState extends State<CatalogPage> {
       }
       rethrow;
     }
+  }
+
+  void _refreshData() {
+    setState(() {
+      _equipmentFuture = _fetchEquipment();
+    });
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      setState(() {
+        _searchQuery = query;
+      });
+      _refreshData();
+    });
   }
 
   List<String> get categories => [
@@ -87,11 +123,7 @@ class _CatalogPageState extends State<CatalogPage> {
             color: Colors.white,
             child: TextField(
               controller: _searchController,
-              onChanged: (value) {
-                setState(() {
-                  searchQuery = value;
-                });
-              },
+              onChanged: _onSearchChanged,
               decoration: InputDecoration(
                 hintText: 'Search equipment...',
                 prefixIcon: const Icon(Icons.search, color: Color(0xFF4A55A2)),
@@ -127,6 +159,7 @@ class _CatalogPageState extends State<CatalogPage> {
                       setState(() {
                         selectedCategory = category;
                       });
+                      _refreshData();
                     },
                     selectedColor: const Color(0xFF4A55A2),
                     checkmarkColor: Colors.white,
@@ -155,34 +188,35 @@ class _CatalogPageState extends State<CatalogPage> {
                 }
 
                 final equipmentList = snapshot.data!;
+                // MODIFIED: Client-side search is removed, we only filter by category now
                 final filteredList = equipmentList.where((equipment) {
-                  final matchesCategory =
-                      selectedCategory == 'All' ||
+                  return selectedCategory == 'All' ||
                       equipment.categoryName == selectedCategory;
-                  final matchesSearch =
-                      searchQuery.isEmpty ||
-                      equipment.name.toLowerCase().contains(
-                        searchQuery.toLowerCase(),
-                      );
-                  return matchesCategory && matchesSearch;
                 }).toList();
 
                 if (filteredList.isEmpty) {
                   return _buildEmptyState();
                 }
 
-                return GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 200,
-                    childAspectRatio: 0.75,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: filteredList.length,
-                  itemBuilder: (context, index) {
-                    return _buildEquipmentCard(filteredList[index]);
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    _searchController.clear();
+                    _onSearchChanged('');
                   },
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 200,
+                          childAspectRatio: 0.75,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                    itemCount: filteredList.length,
+                    itemBuilder: (context, index) {
+                      return _buildEquipmentCard(filteredList[index]);
+                    },
+                  ),
                 );
               },
             ),
@@ -196,23 +230,43 @@ class _CatalogPageState extends State<CatalogPage> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Filter Options'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('Show Available Only'),
-                trailing: Switch(value: false, onChanged: (value) {}),
+        // Use a StatefulBuilder to allow the dialog's content to have its own state
+        return StatefulBuilder(
+          builder: (context, dialogSetState) {
+            return AlertDialog(
+              title: const Text('Filter Options'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SwitchListTile(
+                    title: const Text('Show Available Only'),
+                    value: _showAvailableOnly,
+                    onChanged: (bool value) {
+                      // Use the dialog's own setState to update the switch
+                      dialogSetState(() {
+                        _showAvailableOnly = value;
+                      });
+                    },
+                  ),
+                ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+                // Add an Apply button to confirm the filter change
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    // Trigger a refresh on the main page to apply the filter
+                    _refreshData();
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -264,6 +318,7 @@ class _CatalogPageState extends State<CatalogPage> {
     final isAvailable = equipment.status.toLowerCase() == 'available';
     final fallbackIcon = _getIconForCategory(equipment.categoryName);
 
+    // A helper to create the specs string from the JSONB data
     String specsString = [
       equipment.specifications['RAM'],
       equipment.specifications['Storage'],
@@ -272,122 +327,140 @@ class _CatalogPageState extends State<CatalogPage> {
       equipment.specifications['Technology'],
     ].where((s) => s != null).join(', ');
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withAlpha(25),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
+    // The card is now wrapped in a GestureDetector to make it tappable
+    return GestureDetector(
+      onTap: () {
+        // Navigate to the detail page, passing the selected equipment
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EquipmentDetailPage(equipment: equipment),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 3,
-            child: Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(15),
-                  topRight: Radius.circular(15),
-                ),
-              ),
-              child: Stack(
-                children: [
-                  Center(
-                    child:
-                        (equipment.imageUrl != null &&
-                            equipment.imageUrl!.isNotEmpty)
-                        ? Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Image.network(
-                              equipment.imageUrl!,
-                              fit: BoxFit.contain,
-                              // The incorrect 'padding' property has been removed from here
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return const Center(
-                                      child: CircularProgressIndicator(),
-                                    );
-                                  },
-                              errorBuilder: (context, error, stackTrace) {
-                                return Icon(
-                                  fallbackIcon,
-                                  size: 60,
-                                  color: Colors.grey[400],
-                                );
-                              },
-                            ),
-                          )
-                        : Icon(fallbackIcon, size: 60, color: Colors.grey[400]),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withAlpha(25),
+              spreadRadius: 1,
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 3,
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(15),
+                    topRight: Radius.circular(15),
                   ),
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isAvailable ? Colors.green : Colors.red,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        isAvailable ? 'Available' : 'Borrowed',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                ),
+                child: Stack(
+                  children: [
+                    Center(
+                      child:
+                          (equipment.imageUrl != null &&
+                              equipment.imageUrl!.isNotEmpty)
+                          ? Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Image.network(
+                                equipment.imageUrl!,
+                                fit: BoxFit.contain,
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return const Center(
+                                        child: CircularProgressIndicator(),
+                                      );
+                                    },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Icon(
+                                    fallbackIcon,
+                                    size: 60,
+                                    color: Colors.grey[400],
+                                  );
+                                },
+                              ),
+                            )
+                          : Icon(
+                              fallbackIcon,
+                              size: 60,
+                              color: Colors.grey[400],
+                            ),
+                    ),
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isAvailable ? Colors.green : Colors.red,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          isAvailable ? 'Available' : 'Borrowed',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      equipment.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        equipment.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Flexible(
-                    child: Text(
-                      specsString,
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    const SizedBox(height: 4),
+                    Flexible(
+                      child: Text(
+                        specsString,
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

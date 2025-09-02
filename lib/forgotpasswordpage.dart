@@ -20,9 +20,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     super.dispose();
   }
 
-  // UPDATED: This function is now connected to Supabase
   Future<void> _resetPassword() async {
-    if (_emailController.text.trim().isEmpty) {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter your email address.'),
@@ -37,16 +37,35 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     });
 
     try {
-      await supabase.auth.resetPasswordForEmail(_emailController.text.trim());
+      // Step 1: Check if the email exists in the user_profiles table.
+      final response = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('email', email)
+          .limit(1);
 
-      if (mounted) {
+      // Step 2: If the response is empty, the email is not registered.
+      if (response.isEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Password reset link sent! Please check your email.'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('This email is not registered.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
-        Navigator.of(context).pop();
+      } else {
+        // Step 3: If the email exists, proceed with sending the reset link.
+        await supabase.auth.resetPasswordForEmail(email);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Password reset link sent! Please check your email.',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
       }
     } on AuthException catch (e) {
       if (mounted) {
