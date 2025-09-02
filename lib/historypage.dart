@@ -96,7 +96,7 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget _buildCustomAppBar() {
     return Container(
       width: double.infinity,
-      color: const Color(0xFF2E4F7A), // The dark blue header color.
+      color: const Color(0xFF2B326B), // The dark blue header color.
       child: SafeArea(
         bottom: false,
         child: Padding(

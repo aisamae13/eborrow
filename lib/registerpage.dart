@@ -67,17 +67,23 @@ class _RegisterPageState extends State<RegisterPage> {
     if (value == null || value.isEmpty) {
       return 'Password is required';
     }
+
+    final List<String> errors = [];
+
     if (value.length < 8) {
-      return 'Password must be at least 8 characters';
+      errors.add('At least 8 characters');
     }
     if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
-      return 'Password must contain at least one lowercase letter';
+      errors.add('At least one lowercase letter');
     }
     if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
-      return 'Password must contain at least one uppercase letter';
+      errors.add('At least one uppercase letter');
     }
     if (!RegExp(r'(?=.*\d)').hasMatch(value)) {
-      return 'Password must contain at least one number';
+      errors.add('At least one number');
+    }
+    if (errors.isNotEmpty) {
+      return 'Password must contain:\n\u2022 ${errors.join('\n\u2022 ')}';
     }
     return null;
   }
@@ -214,7 +220,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         fillColor: Colors.grey[200],
                         hintText: 'Enter your first name',
                         hintStyle: TextStyle(
-                          color: Colors.grey[550],
+                          color: Colors.grey[600],
                           fontSize: 14,
                         ),
                         border: OutlineInputBorder(
@@ -250,7 +256,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         fillColor: Colors.grey[200],
                         hintText: 'Enter your last name',
                         hintStyle: TextStyle(
-                          color: Colors.grey[550],
+                          color: Colors.grey[600],
                           fontSize: 14,
                         ),
                         border: OutlineInputBorder(
@@ -287,7 +293,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         fillColor: Colors.grey[200],
                         hintText: 'Enter your email',
                         hintStyle: TextStyle(
-                          color: Colors.grey[550],
+                          color: Colors.grey[600],
                           fontSize: 14,
                         ),
                         border: OutlineInputBorder(
@@ -324,7 +330,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         fillColor: Colors.grey[200],
                         hintText: 'Enter your password',
                         hintStyle: TextStyle(
-                          color: Colors.grey[550],
+                          color: Colors.grey[600],
                           fontSize: 14,
                         ),
                         border: OutlineInputBorder(
@@ -419,7 +425,6 @@ class _RegisterPageState extends State<RegisterPage> {
                               width: 20,
                               child: CircularProgressIndicator(
                                 color: Colors.white,
-                                strokeWidth: 2,
                               ),
                             )
                           : Text(

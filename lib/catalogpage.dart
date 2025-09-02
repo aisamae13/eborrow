@@ -9,16 +9,26 @@ class CatalogPage extends StatefulWidget {
   State<CatalogPage> createState() => _CatalogPageState();
 }
 
-class _CatalogPageState extends State<CatalogPage> {
+class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClientMixin {
   late Future<List<Equipment>> _equipmentFuture;
   String selectedCategory = 'All';
   String searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
+  // Keep the widget alive when switching tabs
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
     _equipmentFuture = _fetchEquipment();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<List<Equipment>> _fetchEquipment() async {
@@ -56,6 +66,8 @@ class _CatalogPageState extends State<CatalogPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -88,9 +100,11 @@ class _CatalogPageState extends State<CatalogPage> {
             child: TextField(
               controller: _searchController,
               onChanged: (value) {
-                setState(() {
-                  searchQuery = value;
-                });
+                if (mounted) {
+                  setState(() {
+                    searchQuery = value;
+                  });
+                }
               },
               decoration: InputDecoration(
                 hintText: 'Search equipment...',
@@ -124,9 +138,11 @@ class _CatalogPageState extends State<CatalogPage> {
                     label: Text(category),
                     selected: isSelected,
                     onSelected: (selected) {
-                      setState(() {
-                        selectedCategory = category;
-                      });
+                      if (mounted) {
+                        setState(() {
+                          selectedCategory = category;
+                        });
+                      }
                     },
                     selectedColor: const Color(0xFF4A55A2),
                     checkmarkColor: Colors.white,
@@ -310,14 +326,13 @@ class _CatalogPageState extends State<CatalogPage> {
                             child: Image.network(
                               equipment.imageUrl!,
                               fit: BoxFit.contain,
-                              // The incorrect 'padding' property has been removed from here
                               loadingBuilder:
                                   (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return const Center(
-                                      child: CircularProgressIndicator(),
-                                    );
-                                  },
+                                if (loadingProgress == null) return child;
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              },
                               errorBuilder: (context, error, stackTrace) {
                                 return Icon(
                                   fallbackIcon,
@@ -393,6 +408,7 @@ class _CatalogPageState extends State<CatalogPage> {
   }
 }
 
+// Equipment class remains the same
 class Equipment {
   final int equipmentId;
   final String name;

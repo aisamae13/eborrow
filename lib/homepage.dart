@@ -43,29 +43,111 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _showSignOutConfirmationDialog() async {
-    final bool? shouldSignOut = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Confirm Sign Out'),
-          content: const Text('Are you sure you want to sign out?'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(context).pop(false),
-            ),
-            TextButton(
-              child: const Text(
-                'Sign Out',
-                style: TextStyle(color: Colors.red),
+Future<void> _showSignOutConfirmationDialog() async {
+  final bool? shouldSignOut = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.logout,
+                  color: const Color(0xFF2B326B),
+                  size: 32,
+                ),
               ),
-              onPressed: () => Navigator.of(context).pop(true),
-            ),
-          ],
-        );
-      },
-    );
+              const SizedBox(height: 16),
+
+              // Title
+              const Text(
+                'Sign out',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Content
+              const Text(
+                'Signing out will end your session.\nAre you sure you want to sign out?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Sign Out Button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2B326B),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Sign out',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Cancel Button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 
     if (shouldSignOut == true) {
       // IMPORTANT: Capture the Navigator before the async operation.
@@ -124,50 +206,46 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       // The rest of the page body
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // This now passes the user's name to the welcome card
-              _buildWelcomeCard(_userName),
+      // REPLACE WITH THIS:
+body: ListView(
+  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+  children: [
+    // This now passes the user's name to the welcome card
+    _buildWelcomeCard(_userName),
 
-              const SizedBox(height: 24),
-              // Quick Actions Section
-              _buildSectionHeader('Quick Actions'),
-              const SizedBox(height: 16),
-              _buildQuickActions(context),
-              const SizedBox(height: 24),
+    const SizedBox(height: 24),
+    // Quick Actions Section
+    _buildSectionHeader('Quick Actions'),
+    const SizedBox(height: 16),
+    _buildQuickActions(context),
+    const SizedBox(height: 24),
 
-              // Equipment Categories Section
-              _buildSectionHeader('Equipment Categories'),
-              const SizedBox(height: 16),
-              _buildCategoryGrid(context),
-              const SizedBox(height: 24),
+    // Equipment Categories Section
+    _buildSectionHeader('Equipment Categories'),
+    const SizedBox(height: 16),
+    _buildCategoryGrid(context),
+    const SizedBox(height: 24),
 
-              // Recent Activity Section
-              _buildSectionHeader('Recent Activity'),
-              const SizedBox(height: 16),
-              _buildRecentActivityItem(
-                icon: Icons.laptop_mac,
-                title: 'MacBook Pro 13"',
-                subtitle: 'Due: Tomorrow',
-                status: 'Borrowed',
-                statusColor: Colors.orange,
-              ),
-              const SizedBox(height: 12),
-              _buildRecentActivityItem(
-                icon: Icons.cable,
-                title: 'HDMI Cable',
-                subtitle: 'Returned: Yesterday',
-                status: 'Returned',
-                statusColor: Colors.green,
-              ),
-            ],
-          ),
-        ),
-      ),
+    // Recent Activity Section
+    _buildSectionHeader('Recent Activity'),
+    const SizedBox(height: 16),
+    _buildRecentActivityItem(
+      icon: Icons.laptop_mac,
+      title: 'MacBook Pro 13"',
+      subtitle: 'Due: Tomorrow',
+      status: 'Borrowed',
+      statusColor: Colors.orange,
+    ),
+    const SizedBox(height: 12),
+    _buildRecentActivityItem(
+      icon: Icons.cable,
+      title: 'HDMI Cable',
+      subtitle: 'Returned: Yesterday',
+      status: 'Returned',
+      statusColor: Colors.green,
+    ),
+  ],
+),
     );
   }
 
@@ -290,54 +368,63 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Reusable widget for the category cards.
-  Widget _buildCategoryGrid(context) {
-    return Wrap(
-      spacing: 16,
-      runSpacing: 16,
-      children: [
-        SizedBox(
-          width: (MediaQuery.of(context).size.width - 48) / 2,
-          child: _buildCategoryCard(
-            icon: Icons.laptop,
-            label: 'Laptops',
-            count: '12 available',
-            color: Colors.blue.shade100,
-            iconColor: Colors.blue.shade800,
+Widget _buildCategoryGrid(context) {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      // Ensure we have a minimum width and handle edge cases
+      final availableWidth = constraints.maxWidth > 32 ? constraints.maxWidth : 320.0;
+      final itemWidth = (availableWidth - 16) / 2; // Account for spacing
+      final clampedItemWidth = itemWidth.clamp(100.0, double.infinity); // Minimum 100px width
+
+      return Wrap(
+        spacing: 16,
+        runSpacing: 16,
+        children: [
+          SizedBox(
+            width: clampedItemWidth,
+            child: _buildCategoryCard(
+              icon: Icons.laptop,
+              label: 'Laptops',
+              count: '12 available',
+              color: Colors.blue.shade100,
+              iconColor: Colors.blue.shade800,
+            ),
           ),
-        ),
-        SizedBox(
-          width: (MediaQuery.of(context).size.width - 48) / 2,
-          child: _buildCategoryCard(
-            icon: Icons.video_camera_front,
-            label: 'Projectors',
-            count: '5 available',
-            color: Colors.purple.shade100,
-            iconColor: Colors.purple.shade800,
+          SizedBox(
+            width: clampedItemWidth,
+            child: _buildCategoryCard(
+              icon: Icons.video_camera_front,
+              label: 'Projectors',
+              count: '5 available',
+              color: Colors.purple.shade100,
+              iconColor: Colors.purple.shade800,
+            ),
           ),
-        ),
-        SizedBox(
-          width: (MediaQuery.of(context).size.width - 48) / 2,
-          child: _buildCategoryCard(
-            icon: Icons.cable,
-            label: 'Cables',
-            count: '23 available',
-            color: Colors.teal.shade100,
-            iconColor: Colors.teal.shade800,
+          SizedBox(
+            width: clampedItemWidth,
+            child: _buildCategoryCard(
+              icon: Icons.cable,
+              label: 'Cables',
+              count: '23 available',
+              color: Colors.teal.shade100,
+              iconColor: Colors.teal.shade800,
+            ),
           ),
-        ),
-        SizedBox(
-          width: (MediaQuery.of(context).size.width - 48) / 2,
-          child: _buildCategoryCard(
-            icon: Icons.headset,
-            label: 'Audio',
-            count: '9 available',
-            color: Colors.red.shade100,
-            iconColor: Colors.red.shade800,
+          SizedBox(
+            width: clampedItemWidth,
+            child: _buildCategoryCard(
+              icon: Icons.headset,
+              label: 'Audio',
+              count: '9 available',
+              color: Colors.red.shade100,
+              iconColor: Colors.red.shade800,
+            ),
           ),
-        ),
-      ],
-    );
-  }
+        ],
+      );
+    },
+  );
+}
 
   // Reusable widget for the category cards.
   Widget _buildCategoryCard({
