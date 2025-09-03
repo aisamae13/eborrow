@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'landingpage.dart';
 import 'main.dart';
+import 'profile_page.dart';
+
 
 class HomePage extends StatefulWidget {
   final Function(int) onNavigate;
@@ -14,245 +14,241 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String? _userName;
+  late final Future<List<BorrowRequest>> _recentActivityFuture;
+  late final Future<List<EquipmentCategory>> _categoriesFuture;
+  bool _showStudentIdBanner = false;
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    // Use the single, more complete method to load user data
+    _loadUserDataAndCheckProfile();
+    // Initialize the futures
+    _recentActivityFuture = _fetchRecentActivity();
+    _categoriesFuture = _fetchCategories();
   }
 
-  // UPDATED: This function is now smarter about finding the user's name
-  void _loadUserData() {
+  Future<void> _loadUserDataAndCheckProfile() async {
     final user = supabase.auth.currentUser;
-    if (user != null) {
-      // For users who signed up with email, we look for 'first_name'
-      String? firstName = user.userMetadata?['first_name'];
+    if (user == null) return;
 
-      // For users who signed in with Google, the name is often in 'full_name'
-      String? fullName = user.userMetadata?['full_name'];
-
-      // We prioritize the first name, but fall back to the full name
-      final name = firstName ?? fullName;
-
-      if (name != null) {
-        // We only want the first part of the name if it's a full name
-        setState(() {
-          _userName = name.split(' ')[0];
-        });
-      }
+    final name =
+        user.userMetadata?['first_name'] ?? user.userMetadata?['full_name'];
+    if (name != null) {
+      setState(() {
+        _userName = name.split(' ')[0];
+      });
     }
-  }
 
-Future<void> _showSignOutConfirmationDialog() async {
-  final bool? shouldSignOut = await showDialog<bool>(
-    context: context,
-    barrierDismissible: false,
-    builder: (BuildContext context) {
-      return Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Icon
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.logout,
-                  color: const Color(0xFF2B326B),
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Title
-              const Text(
-                'Sign out',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Content
-              const Text(
-                'Signing out will end your session.\nAre you sure you want to sign out?',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Sign Out Button
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2B326B),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Sign out',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Cancel Button
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.grey,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                  ),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-
-    if (shouldSignOut == true) {
-      // IMPORTANT: Capture the Navigator before the async operation.
-      // This avoids using 'BuildContext' across async gaps.
-      final navigator = Navigator.of(context);
-
+    final isGoogleUser = user.appMetadata['provider'] == 'google';
+    if (isGoogleUser) {
       try {
-        await supabase.auth.signOut();
-
-        // After successful sign out, perform the navigation.
-        await navigator.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LandingPage()),
-          (route) => false,
-        );
-      } on AuthException catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.message),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
+        final profile = await supabase
+            .from('user_profiles')
+            .select('student_id')
+            .eq('id', user.id)
+            .single();
+        final studentId = profile['student_id'];
+        if (studentId == null || studentId.isEmpty) {
+          setState(() {
+            _showStudentIdBanner = true;
+          });
         }
+      } catch (_) {
+        // Handle cases where profile might not exist yet
       }
     }
   }
+
+  Future<List<BorrowRequest>> _fetchRecentActivity() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+    try {
+      final response = await supabase
+          .from('borrow_requests')
+          .select('*, equipment(name, brand, image_url)')
+          .eq('borrower_id', userId)
+          .order('created_at', ascending: false)
+          .limit(2);
+      return response.map((map) => BorrowRequest.fromMap(map)).toList();
+    } catch (e) {
+      // Silently fail is okay for a summary view
+      return [];
+    }
+  }
+
+  Future<List<EquipmentCategory>> _fetchCategories() async {
+    try {
+      final categoriesResponse = await supabase.from('equipment_categories').select();
+      final categories = categoriesResponse.map((map) {
+        return EquipmentCategory(
+          id: map['category_id'],
+          name: map['category_name'],
+        );
+      }).toList();
+
+      final equipmentResponse = await supabase
+          .from('equipment')
+          .select('category_id')
+          .ilike('status', 'available');
+
+      for (var category in categories) {
+        final count = equipmentResponse
+            .where((item) => item['category_id'] == category.id)
+            .length;
+        category.availableCount = count;
+      }
+      return categories;
+    } catch (e) {
+      return [];
+    }
+  }
+
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      // Standard app bar with the desired colors and content.
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text(
-          'Borrower',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: const Color(0xFF2B326B),
-        actions: [
-          // ADD THIS IconButton FOR SIGN OUT
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed:
-                _showSignOutConfirmationDialog, // Call the new function here
-          ),
-          const SizedBox(width: 8), // Adjust spacing if needed
-        ],
-        // The yellow line is now part of the app bar's bottom property.
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(4.0),
-          child: Container(color: const Color(0xFFFFC107), height: 4.0),
+  @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      automaticallyImplyLeading: false,
+      title: const Text(
+        'Borrower',
+        style: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
         ),
       ),
-      // The rest of the page body
-      // REPLACE WITH THIS:
-body: ListView(
-  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-  children: [
-    // This now passes the user's name to the welcome card
-    _buildWelcomeCard(_userName),
-
-    const SizedBox(height: 24),
-    // Quick Actions Section
-    _buildSectionHeader('Quick Actions'),
-    const SizedBox(height: 16),
-    _buildQuickActions(context),
-    const SizedBox(height: 24),
-
-    // Equipment Categories Section
-    _buildSectionHeader('Equipment Categories'),
-    const SizedBox(height: 16),
-    _buildCategoryGrid(context),
-    const SizedBox(height: 24),
-
-    // Recent Activity Section
-    _buildSectionHeader('Recent Activity'),
-    const SizedBox(height: 16),
-    _buildRecentActivityItem(
-      icon: Icons.laptop_mac,
-      title: 'MacBook Pro 13"',
-      subtitle: 'Due: Tomorrow',
-      status: 'Borrowed',
-      statusColor: Colors.orange,
+      backgroundColor: const Color(0xFF2B326B),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.person_outline, color: Colors.white),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfilePage()),
+            );
+          },
+        ),
+        const SizedBox(width: 8),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(4.0),
+        child: Container(color: const Color(0xFFFFC107), height: 4.0),
+      ),
     ),
-    const SizedBox(height: 12),
-    _buildRecentActivityItem(
-      icon: Icons.cable,
-      title: 'HDMI Cable',
-      subtitle: 'Returned: Yesterday',
-      status: 'Returned',
-      statusColor: Colors.green,
+    body: SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildWelcomeCard(_userName),
+            if (_showStudentIdBanner) _buildStudentIdBanner(),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Quick Actions'),
+            const SizedBox(height: 16),
+            _buildQuickActions(context),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Equipment Categories'),
+            const SizedBox(height: 16),
+            FutureBuilder<List<EquipmentCategory>>(
+              future: _categoriesFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return const Center(child: Text('Error loading categories.'));
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text('No categories available.'));
+                } else {
+                  return _buildCategoryGrid(snapshot.data!);
+                }
+              },
+            ),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Recent Activity'),
+            const SizedBox(height: 16),
+                      FutureBuilder<List<BorrowRequest>>(
+            future: _recentActivityFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return const Center(
+                  child: Text('Error loading recent activity.'),
+                );
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                // Add a SizedBox to create space below the text
+                return const Column(
+                  children: [
+                    Center(
+                      child: Text('No recent activity to show.'),
+                    ),
+                    SizedBox(height: 24),
+                  ],
+                );
+              } else {
+                return Column(
+                  children: [
+                    ...snapshot.data!
+                        .map((item) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12.0),
+                              child: _buildRecentActivityItem(item),
+                            ))
+                        .toList(),
+                    const SizedBox(height: 24),
+                  ],
+                );
+              }
+            },
+          ),
+          ],
+        ),
+      ),
     ),
-  ],
-),
+  );
+}
+
+  // New banner widget to prompt user for student ID
+  Widget _buildStudentIdBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(top: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFC107).withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFC107)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: Color(0xFFFFC107), size: 28),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Please add your Student ID in your profile to borrow equipment.',
+              style: TextStyle(
+                color: Color(0xFF2B326B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfilePage()),
+            ),
+            child: const Text('Add ID', style: TextStyle(color: Color(0xFF2B326B))),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildWelcomeCard(String? userName) {
-    // Display the user's name if available, otherwise show a default message
     final displayName = userName ?? 'Welcome!';
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -276,7 +272,7 @@ body: ListView(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Welcome, $displayName!', // This line is now dynamic
+            'Welcome, $displayName!',
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -293,7 +289,6 @@ body: ListView(
     );
   }
 
-  // Helper method to build the header for each section.
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
@@ -305,13 +300,12 @@ body: ListView(
     );
   }
 
-  // Helper method for the Quick Actions buttons.
   Widget _buildQuickActions(BuildContext context) {
     return Row(
       children: [
         Expanded(
           child: GestureDetector(
-            onTap: () => widget.onNavigate(2), // 2 is the index for Scan QR
+            onTap: () => widget.onNavigate(2),
             child: _buildActionCard(
               icon: Icons.qr_code_scanner,
               label: 'Scan QR',
@@ -324,7 +318,7 @@ body: ListView(
         const SizedBox(width: 16),
         Expanded(
           child: GestureDetector(
-            onTap: () => widget.onNavigate(1), // 1 is the index for Catalog
+            onTap: () => widget.onNavigate(1),
             child: _buildActionCard(
               icon: Icons.search,
               label: 'Browse',
@@ -338,7 +332,6 @@ body: ListView(
     );
   }
 
-  // Reusable widget for the action cards.
   Widget _buildActionCard({
     required IconData icon,
     required String label,
@@ -367,66 +360,59 @@ body: ListView(
     );
   }
 
-  // Reusable widget for the category cards.
-Widget _buildCategoryGrid(context) {
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      // Ensure we have a minimum width and handle edge cases
-      final availableWidth = constraints.maxWidth > 32 ? constraints.maxWidth : 320.0;
-      final itemWidth = (availableWidth - 16) / 2; // Account for spacing
-      final clampedItemWidth = itemWidth.clamp(100.0, double.infinity); // Minimum 100px width
+  Widget _buildCategoryGrid(List<EquipmentCategory> categories) {
+    return Wrap(
+      spacing: 16,
+      runSpacing: 16,
+      children: categories
+          .map((category) => SizedBox(
+                width: (MediaQuery.of(context).size.width - 48) / 2,
+                child: _buildCategoryCard(
+                  icon: _getIconForCategory(category.name),
+                  label: category.name,
+                  count: '${category.availableCount} available',
+                  color: _getColorForCategory(category.name).shade100,
+                  iconColor: _getColorForCategory(category.name).shade800,
+                ),
+              ))
+          .toList(),
+    );
+  }
 
-      return Wrap(
-        spacing: 16,
-        runSpacing: 16,
-        children: [
-          SizedBox(
-            width: clampedItemWidth,
-            child: _buildCategoryCard(
-              icon: Icons.laptop,
-              label: 'Laptops',
-              count: '12 available',
-              color: Colors.blue.shade100,
-              iconColor: Colors.blue.shade800,
-            ),
-          ),
-          SizedBox(
-            width: clampedItemWidth,
-            child: _buildCategoryCard(
-              icon: Icons.video_camera_front,
-              label: 'Projectors',
-              count: '5 available',
-              color: Colors.purple.shade100,
-              iconColor: Colors.purple.shade800,
-            ),
-          ),
-          SizedBox(
-            width: clampedItemWidth,
-            child: _buildCategoryCard(
-              icon: Icons.cable,
-              label: 'Cables',
-              count: '23 available',
-              color: Colors.teal.shade100,
-              iconColor: Colors.teal.shade800,
-            ),
-          ),
-          SizedBox(
-            width: clampedItemWidth,
-            child: _buildCategoryCard(
-              icon: Icons.headset,
-              label: 'Audio',
-              count: '9 available',
-              color: Colors.red.shade100,
-              iconColor: Colors.red.shade800,
-            ),
-          ),
-        ],
-      );
-    },
-  );
-}
+  IconData _getIconForCategory(String categoryName) {
+    switch (categoryName) {
+      case 'Laptops':
+        return Icons.laptop;
+      case 'Projectors':
+        return Icons.video_camera_front;
+      case 'HDMI Cables':
+        return Icons.cable;
+      case 'Audio':
+        return Icons.headset;
+      case 'Tablets':
+        return Icons.tablet_mac;
+      default:
+        return Icons.category;
+    }
+  }
 
-  // Reusable widget for the category cards.
+  MaterialColor _getColorForCategory(String categoryName) {
+    switch (categoryName) {
+      case 'Laptops':
+        return Colors.blue;
+      case 'Projectors':
+        return Colors.purple;
+      case 'HDMI Cables':
+        return Colors.teal;
+      case 'Audio':
+        return Colors.red;
+      case 'Tablets':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
   Widget _buildCategoryCard({
     required IconData icon,
     required String label,
@@ -453,14 +439,7 @@ Widget _buildCategoryGrid(context) {
     );
   }
 
-  // Reusable widget for the recent activity list items.
-  Widget _buildRecentActivityItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String status,
-    required Color statusColor,
-  }) {
+  Widget _buildRecentActivityItem(BorrowRequest item) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -477,18 +456,18 @@ Widget _buildCategoryGrid(context) {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 36, color: Colors.grey[600]),
+          Icon(Icons.history_toggle_off, size: 36, color: Colors.grey[600]),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  item.equipmentName,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  subtitle,
+                  'Status: ${item.status}',
                   style: TextStyle(color: Colors.grey[600], fontSize: 12),
                 ),
               ],
@@ -497,13 +476,13 @@ Widget _buildCategoryGrid(context) {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.2),
+              color: item.getStatusColor().withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              status,
+              item.status,
               style: TextStyle(
-                color: statusColor,
+                color: item.getStatusColor(),
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),
@@ -513,4 +492,63 @@ Widget _buildCategoryGrid(context) {
       ),
     );
   }
+}
+
+// Make sure to define these models in separate files as per the original imports.
+// Example: models/borrow_request.dart
+class BorrowRequest {
+  final int borrowId;
+  final String borrowerId;
+  final int equipmentId;
+  final DateTime requestedAt;
+  final String status;
+  final String equipmentName;
+
+  BorrowRequest({
+    required this.borrowId,
+    required this.borrowerId,
+    required this.equipmentId,
+    required this.requestedAt,
+    required this.status,
+    required this.equipmentName,
+  });
+
+  factory BorrowRequest.fromMap(Map<String, dynamic> map) {
+    return BorrowRequest(
+      borrowId: map['borrow_id'],
+      borrowerId: map['borrower_id'],
+      equipmentId: map['equipment_id'],
+      requestedAt: DateTime.parse(map['requested_at']),
+      status: map['status'],
+      equipmentName: map['equipment']['name'],
+    );
+  }
+
+  Color getStatusColor() {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'borrowed':
+        return Colors.blue;
+      case 'returned':
+        return Colors.green;
+      case 'denied':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+}
+
+// Example: models/equipment_category.dart
+class EquipmentCategory {
+  final int id;
+  final String name;
+  int availableCount;
+
+  EquipmentCategory({
+    required this.id,
+    required this.name,
+    this.availableCount = 0,
+  });
 }

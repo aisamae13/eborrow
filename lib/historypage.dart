@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'main.dart';
+import 'models/borrow_request.dart';
+import 'package:eborrow/utils/string_extension.dart'; // <--- Tiyakin na TAMA ang path na ito
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -8,95 +12,123 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  // Tracks the currently selected tab: 0 for Active, 1 for History.
   int _selectedIndex = 0;
+  Future<List<BorrowRequest>>? _requestsFuture;
 
-  // Sample data for active and history items.
-  // This would typically come from an external source (like a database).
-  final List<BorrowedItem> _activeItems = [
-    BorrowedItem(
-      name: 'MacBook Pro 13"',
-      borrowedDate: '2025-08-15',
-      dueDate: '2025-08-17',
-      status: 'Active',
-      statusColor: Colors.orange,
-    ),
-    BorrowedItem(
-      name: 'MacBook Pro 13"',
-      borrowedDate: '2025-06-25',
-      dueDate: '2025-06-29',
-      status: 'Overdue',
-      statusColor: Colors.red,
-    ),
-    BorrowedItem(
-      name: 'MacBook Pro 13"',
-      borrowedDate: '2025-01-15',
-      dueDate: '2025-01-18',
-      status: 'Active',
-      statusColor: Colors.orange,
-    ),
-  ];
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _requestsFuture ??= _fetchBorrowRequests();
+  }
 
-  final List<BorrowedItem> _historyItems = [
-    BorrowedItem(
-      name: 'HDMI Cable',
-      borrowedDate: '2025-01-10',
-      returnedDate: '2025-01-12',
-      status: 'Returned',
-      statusColor: Colors.green,
-    ),
-    BorrowedItem(
-      name: 'HDMI Cable',
-      borrowedDate: '2025-01-10',
-      returnedDate: '2025-01-12',
-      status: 'Returned',
-      statusColor: Colors.green,
-    ),
-    BorrowedItem(
-      name: 'HDMI Cable',
-      borrowedDate: '2025-01-10',
-      returnedDate: '2025-01-12',
-      status: 'Returned',
-      statusColor: Colors.green,
-    ),
-    BorrowedItem(
-      name: 'HDMI Cable',
-      borrowedDate: '2025-06-10',
-      returnedDate: '2025-01-12',
-      status: 'Returned',
-      statusColor: Colors.green,
-    ),
-    BorrowedItem(
-      name: 'HDMI Cable',
-      borrowedDate: '2025-01-10',
-      returnedDate: '2025-01-12',
-      status: 'Returned',
-      statusColor: Colors.green,
-    ),
-  ];
+  Future<List<BorrowRequest>> _fetchBorrowRequests() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) {
+      return [];
+    }
+
+    try {
+      final response = await supabase
+          .from('borrow_requests')
+          .select(
+            '*, equipment(name)',
+          )
+          .eq('borrower_id', userId)
+          .order('created_at', ascending: false);
+
+      final requestList = response
+          .map((map) => BorrowRequest.fromMap(map))
+          .toList();
+      return requestList;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error fetching history. Check your connection.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _refreshData() async {
+    setState(() {
+      _requestsFuture = _fetchBorrowRequests();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Custom App Bar with Tab functionality
-            _buildCustomAppBar(),
+      body: Column(
+        children: [
+          _buildCustomAppBar(),
+          Expanded(
+            child: FutureBuilder<List<BorrowRequest>>(
+              future: _requestsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return RefreshIndicator(
+                    onRefresh: _refreshData,
+                    child: Center(
+                      child: Text('Error: ${snapshot.error}'),
+                    ),
+                  );
+                }
 
-            // The main content of the page changes based on the selected tab.
-            _selectedIndex == 0 ? _buildActiveItemsList() : _buildHistoryItemsList(),
-          ],
-        ),
+                final allRequests = snapshot.data!;
+                if (allRequests.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: _refreshData,
+                    child: Stack(children: [ListView(), _buildEmptyState()]),
+                  );
+                }
+
+                // Filter the requests into active and history lists
+                final activeItems = allRequests
+                    .where(
+                      (r) => [
+                        'pending',
+                        'approved',
+                        'active',
+                        'overdue',
+                      ].contains(r.status.toLowerCase()),
+                    )
+                    .toList();
+
+                final historyItems = allRequests
+                    .where(
+                      (r) => [
+                        'returned',
+                        'rejected',
+                        'cancelled',
+                      ].contains(r.status.toLowerCase()),
+                    )
+                    .toList();
+
+                return RefreshIndicator(
+                  onRefresh: _refreshData,
+                  child: _selectedIndex == 0
+                      ? _buildItemsList(activeItems)
+                      : _buildItemsList(historyItems),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // A custom app bar that includes a title and a tab selector.
   Widget _buildCustomAppBar() {
     return Container(
       width: double.infinity,
-      color: const Color(0xFF2B326B), // The dark blue header color.
+      color: const Color(0xFF2B326B),
       child: SafeArea(
         bottom: false,
         child: Padding(
@@ -121,24 +153,19 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  // The widget for the "Active" and "History" tabs.
   Widget _buildTabSelector() {
     return Row(
       children: [
         Expanded(
           child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedIndex = 0;
-              });
-            },
+            onTap: () => setState(() => _selectedIndex = 0),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
                     color: _selectedIndex == 0
-                        ? const Color(0xFFECA352) // Highlight color for active tab.
+                        ? const Color(0xFFECA352)
                         : Colors.white.withOpacity(0.3),
                     width: 3.0,
                   ),
@@ -160,18 +187,14 @@ class _HistoryPageState extends State<HistoryPage> {
         ),
         Expanded(
           child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedIndex = 1;
-              });
-            },
+            onTap: () => setState(() => _selectedIndex = 1),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
                     color: _selectedIndex == 1
-                        ? const Color(0xFFECA352) // Highlight color for history tab.
+                        ? const Color(0xFFECA352)
                         : Colors.white.withOpacity(0.3),
                     width: 3.0,
                   ),
@@ -195,38 +218,54 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  // Builds the list of active borrowed items.
-  Widget _buildActiveItemsList() {
-    return Padding(
+  Widget _buildItemsList(List<BorrowRequest> items) {
+    if (items.isEmpty) {
+      return _buildEmptyState(isHistory: _selectedIndex == 1);
+    }
+    return ListView.builder(
       padding: const EdgeInsets.all(16.0),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16.0),
+          child: _buildBorrowedItemCard(items[index]),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState({bool isHistory = false}) {
+    return Center(
       child: Column(
-        children: _activeItems.map((item) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
-            child: _buildBorrowedItemCard(item),
-          );
-        }).toList(),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.list_alt, size: 80, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            isHistory ? 'No History Found' : 'No Active Items',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isHistory
+                ? 'Your past borrowings will appear here.'
+                : 'Your pending and active borrowings will appear here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey[500]),
+          ),
+        ],
       ),
     );
   }
 
-  // Builds the list of returned items from history.
-  Widget _buildHistoryItemsList() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: _historyItems.map((item) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
-            child: _buildBorrowedItemCard(item),
-          );
-        }).toList(),
-      ),
-    );
-  }
+  Widget _buildBorrowedItemCard(BorrowRequest item) {
+    final statusColor = item.getStatusColor();
+     final dateTimeFormatter = DateFormat('MMM dd, yyyy hh:mm a');
 
-  // Reusable widget for an individual borrowed item card.
-  Widget _buildBorrowedItemCard(BorrowedItem item) {
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -247,23 +286,30 @@ class _HistoryPageState extends State<HistoryPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                item.name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              Flexible(
+                child: Text(
+                  item.equipmentName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10.0,
+                  vertical: 4.0,
+                ),
                 decoration: BoxDecoration(
-                  color: item.statusColor.withOpacity(0.2),
+                  color: statusColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12.0),
                 ),
                 child: Text(
-                  item.status,
+                  item.status.capitalize(),
                   style: TextStyle(
-                    color: item.statusColor,
+                    color: statusColor,
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),
@@ -273,17 +319,17 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Borrowed: ${item.borrowedDate}',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 12,
-            ),
+            'Borrowed: ${dateTimeFormatter.format(item.borrowDate)}',
+            style: TextStyle(color: Colors.grey[600], fontSize: 12),
           ),
           const SizedBox(height: 4),
           Text(
-            item.status == 'Returned' ? 'Returned: ${item.returnedDate}' : 'Due: ${item.dueDate}',
+            // Itong linya ang kailangan ding i-capitalize
+            item.status.toLowerCase() == 'returned'
+                ? 'Returned: ${dateTimeFormatter.format(item.returnDate)}'.capitalize()
+                : 'Due: ${dateTimeFormatter.format(item.returnDate)}'.capitalize(),
             style: TextStyle(
-              color: item.statusColor,
+              color: statusColor,
               fontWeight: FontWeight.bold,
               fontSize: 12,
             ),
@@ -292,23 +338,4 @@ class _HistoryPageState extends State<HistoryPage> {
       ),
     );
   }
-}
-
-// A simple model class for a borrowed item to keep data organized.
-class BorrowedItem {
-  final String name;
-  final String borrowedDate;
-  final String status;
-  final Color statusColor;
-  final String? dueDate;
-  final String? returnedDate;
-
-  BorrowedItem({
-    required this.name,
-    required this.borrowedDate,
-    required this.status,
-    required this.statusColor,
-    this.dueDate,
-    this.returnedDate,
-  });
 }

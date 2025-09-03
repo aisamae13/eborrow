@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'main.dart';
+import 'models/equipment_model.dart'; // This is the correct import
+import 'equipment_detail_page.dart';
 
 class ScanQRPage extends StatefulWidget {
   const ScanQRPage({Key? key}) : super(key: key);
@@ -104,159 +108,139 @@ class _ScanQRPageState extends State<ScanQRPage> with WidgetsBindingObserver {
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4.0),
-          child: Container(
-            color: const Color(0xFFFDC031),
-            height: 4.0,
-          ),
+          child: Container(color: const Color(0xFFFDC031), height: 4.0),
         ),
       ),
-      body: _buildBody(),
-    );
-  }
-
-  Widget _buildBody() {
-    if (errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              color: Colors.red,
-              size: 64,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              errorMessage!,
-              style: const TextStyle(color: Colors.red, fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  errorMessage = null;
-                });
-                _initializeCamera();
-              },
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (!isInitialized) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
-    return Stack(
-      children: [
-        // Camera preview
-        MobileScanner(
-          controller: cameraController,
-          onDetect: _onQRCodeDetected,
-        ),
-
-        // UI overlay
-        Column(
-          children: [
-            const Expanded(child: SizedBox()),
-            Container(
-              height: 80,
-              width: double.infinity,
-              color: const Color(0xFFEBEBEB),
-              alignment: Alignment.center,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20.0),
-                child: Text(
-                  'Position the QR code within the frame',
-                  style: TextStyle(
-                    color: Color(0xFF888888),
-                    fontSize: 16,
+      body: Stack(
+        children: [
+          // Layer 1: The full-screen camera preview
+          MobileScanner(
+            controller: cameraController,
+            onDetect: (capture) {
+              if (isScanning) {
+                final List<Barcode> barcodes = capture.barcodes;
+                for (final barcode in barcodes) {
+                  if (barcode.rawValue != null) {
+                    setState(() {
+                      isScanning = false;
+                    });
+                    // Call the new, corrected function
+                    _handleScan(barcode.rawValue!);
+                  }
+                }
+              }
+            },
+          ),
+          // Layer 2: UI elements on top of the camera
+          Column(
+            children: [
+              const Expanded(child: SizedBox()),
+              Container(
+                height: 80,
+                width: double.infinity,
+                color: const Color(0xFFEBEBEB),
+                alignment: Alignment.center,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Text(
+                    'Position the QR code within the frame',
+                    style: TextStyle(
+                      color: Color(0xFF888888),
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  void _onQRCodeDetected(BarcodeCapture capture) {
-    if (!isScanning || !mounted) return;
-
-    final List<Barcode> barcodes = capture.barcodes;
-    for (final barcode in barcodes) {
-      if (barcode.rawValue != null && barcode.rawValue!.isNotEmpty) {
-        setState(() {
-          isScanning = false;
-        });
-
-        // Stop the camera immediately to prevent further scanning
-        cameraController.stop();
-
-        _showResultDialog(barcode.rawValue!);
-        break; // Only process the first valid barcode
-      }
-    }
-  }
-
-  void _showResultDialog(String result) {
+  Future<void> _handleScan(String qrCode) async {
+    // Show a loading indicator while we search the database
     showDialog(
       context: context,
-      barrierDismissible: false, // Prevent dismissing by tapping outside
+      barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Scan Result'),
-          content: Text(result),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _resumeScanning();
-              },
-              child: const Text('OK'),
-            ),
-            TextButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: result));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Copied to clipboard')),
-                );
-                Navigator.of(context).pop();
-                _resumeScanning();
-              },
-              child: const Text('Copy'),
-            ),
-          ],
-        );
+        return const Center(child: CircularProgressIndicator());
       },
     );
-  }
 
-  void _resumeScanning() {
-    if (!mounted) return;
+    try {
+      final response = await supabase
+          .from('equipment')
+          .select('*, equipment_categories(*)')
+          .eq('qr_code', qrCode)
+          .maybeSingle();
 
-    setState(() {
-      isScanning = true;
-    });
+      // Dismiss the loading dialog
+      Navigator.of(context).pop();
 
-    // Restart the camera
-    if (isInitialized) {
-      cameraController.start();
+      if (response != null) {
+        // Equipment found! Navigate to the detail page.
+        final equipment = Equipment.fromMap(response);
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => EquipmentDetailPage(equipment: equipment),
+            ),
+          );
+        }
+      } else {
+        // No equipment found with that QR code
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No equipment found for this QR code.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          // Resume scanning after a brief delay
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              setState(() {
+                isScanning = true;
+              });
+            }
+          });
+        }
+      }
+    } on PostgrestException catch (e) {
+      // Handle Supabase errors
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      // Handle any other errors
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An unexpected error occurred: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      // Ensure scanning is re-enabled if an error occurred
+      if (!isScanning && mounted) {
+        setState(() {
+          isScanning = true;
+        });
+      }
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    if (isInitialized) {
-      cameraController.dispose();
-    }
+    cameraController.dispose();
     super.dispose();
   }
 }

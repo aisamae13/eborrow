@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import 'main.dart';
+import 'equipment_detail_page.dart';
+import 'package:eborrow/models/equipment_model.dart'; // Tiyakin na tama ang import path na ito
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({super.key});
@@ -11,32 +15,75 @@ class CatalogPage extends StatefulWidget {
 
 class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClientMixin {
   late Future<List<Equipment>> _equipmentFuture;
+  late Future<List<String>> _categoriesFuture;
   String selectedCategory = 'All';
-  String searchQuery = '';
+  String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-
-  // Keep the widget alive when switching tabs
-  @override
-  bool get wantKeepAlive => true;
+  Timer? _debounce;
+  bool _showAvailableOnly = false;
 
   @override
   void initState() {
     super.initState();
+    _categoriesFuture = _fetchCategories();
     _equipmentFuture = _fetchEquipment();
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  @override
+  bool get wantKeepAlive => true;
+
+  Future<List<String>> _fetchCategories() async {
+    try {
+      final response = await supabase
+          .from('equipment_categories')
+          .select('category_name');
+
+      final categoryList = response
+          .map((map) => map['category_name'] as String)
+          .toList();
+
+      return ['All', ...categoryList];
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error fetching categories: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<List<Equipment>> _fetchEquipment() async {
     try {
-      final response = await supabase
+      var query = supabase
           .from('equipment')
-          .select('*, equipment_categories(category_name)');
+          .select('*, equipment_categories!inner(category_name)');
 
+      if (_searchQuery.isNotEmpty) {
+        query = query.ilike('name', '%$_searchQuery%');
+      }
+
+      if (selectedCategory != 'All') {
+        query = query.eq('equipment_categories.category_name', selectedCategory);
+      }
+
+      if (_showAvailableOnly) {
+        query = query.eq('status', 'available');
+      }
+
+      final response = await query;
       final equipmentList = response.map((map) {
         return Equipment.fromMap(map);
       }).toList();
@@ -55,25 +102,34 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
     }
   }
 
-  List<String> get categories => [
-    'All',
-    'Laptops',
-    'Projectors',
-    'HDMI Cables',
-    'Audio',
-    'Tablets',
-  ];
+  void _refreshData() {
+    setState(() {
+      _equipmentFuture = _fetchEquipment();
+    });
+  }
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          _searchQuery = _searchController.text;
+          _equipmentFuture = _fetchEquipment();
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context);
 
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text(
+        title: Text(
           'Catalog',
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: 22,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -99,16 +155,18 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
             color: Colors.white,
             child: TextField(
               controller: _searchController,
-              onChanged: (value) {
-                if (mounted) {
-                  setState(() {
-                    searchQuery = value;
-                  });
-                }
-              },
               decoration: InputDecoration(
                 hintText: 'Search equipment...',
                 prefixIcon: const Icon(Icons.search, color: Color(0xFF4A55A2)),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: Color(0xFF4A55A2)),
+                        onPressed: () {
+                          _searchController.clear();
+                          _onSearchChanged();
+                        },
+                      )
+                    : null,
                 filled: true,
                 fillColor: Colors.grey[100],
                 border: OutlineInputBorder(
@@ -122,40 +180,50 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
               ),
             ),
           ),
-          Container(
-            height: 60,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: categories.length,
-              itemBuilder: (context, index) {
-                final category = categories[index];
-                final isSelected = selectedCategory == category;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(category),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      if (mounted) {
-                        setState(() {
-                          selectedCategory = category;
-                        });
-                      }
-                    },
-                    selectedColor: const Color(0xFF4A55A2),
-                    checkmarkColor: Colors.white,
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : Colors.black87,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
-                  ),
-                );
-              },
-            ),
+          FutureBuilder<List<String>>(
+            future: _categoriesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text('Error loading categories: ${snapshot.error}'));
+              }
+
+              final categories = snapshot.data!;
+              return Container(
+                height: 60,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    final isSelected = selectedCategory == category;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: Text(category),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            selectedCategory = category;
+                            _equipmentFuture = _fetchEquipment();
+                          });
+                        },
+                        selectedColor: const Color(0xFF4A55A2),
+                        checkmarkColor: Colors.white,
+                        labelStyle: GoogleFonts.poppins(
+                          color: isSelected ? Colors.white : Colors.black87,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           ),
           Expanded(
             child: FutureBuilder<List<Equipment>>(
@@ -171,34 +239,43 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
                 }
 
                 final equipmentList = snapshot.data!;
-                final filteredList = equipmentList.where((equipment) {
-                  final matchesCategory =
-                      selectedCategory == 'All' ||
-                      equipment.categoryName == selectedCategory;
-                  final matchesSearch =
-                      searchQuery.isEmpty ||
-                      equipment.name.toLowerCase().contains(
-                        searchQuery.toLowerCase(),
-                      );
-                  return matchesCategory && matchesSearch;
-                }).toList();
-
-                if (filteredList.isEmpty) {
+                if (equipmentList.isEmpty) {
                   return _buildEmptyState();
                 }
 
-                return GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 200,
-                    childAspectRatio: 0.75,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: filteredList.length,
-                  itemBuilder: (context, index) {
-                    return _buildEquipmentCard(filteredList[index]);
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                      selectedCategory = 'All';
+                      _showAvailableOnly = false;
+                      _equipmentFuture = _fetchEquipment();
+                    });
                   },
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 200,
+                      childAspectRatio: 0.75,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                    ),
+                    itemCount: equipmentList.length,
+                    itemBuilder: (context, index) {
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EquipmentDetailPage(equipment: equipmentList[index]),
+                            ),
+                          );
+                        },
+                        child: _buildEquipmentCard(equipmentList[index]),
+                      );
+                    },
+                  ),
                 );
               },
             ),
@@ -212,23 +289,76 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Filter Options'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('Show Available Only'),
-                trailing: Switch(value: false, onChanged: (value) {}),
+        return StatefulBuilder(
+          builder: (context, dialogSetState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    Text(
+                      'Filter Options',
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF2B326B),
+                      ),
+                    ),
+                    const Divider(),
+                    SwitchListTile(
+                      title: const Text('Show Available Only'),
+                      value: _showAvailableOnly,
+                      onChanged: (bool value) {
+                        dialogSetState(() {
+                          _showAvailableOnly = value;
+                        });
+                      },
+                      activeColor: const Color(0xFF2B326B),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF2B326B),
+                            side: const BorderSide(color: Color(0xFF2B326B)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text('Close'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _refreshData();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2B326B),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                          ),
+                          child: const Text('Apply'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -243,7 +373,7 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
           const SizedBox(height: 16),
           Text(
             'No equipment found',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.grey[600],
@@ -252,7 +382,7 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
           const SizedBox(height: 8),
           Text(
             'Try adjusting your search or filter',
-            style: TextStyle(color: Colors.grey[500]),
+            style: GoogleFonts.poppins(color: Colors.grey[500]),
           ),
         ],
       ),
@@ -318,20 +448,15 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
               child: Stack(
                 children: [
                   Center(
-                    child:
-                        (equipment.imageUrl != null &&
-                            equipment.imageUrl!.isNotEmpty)
+                    child: (equipment.imageUrl != null && equipment.imageUrl!.isNotEmpty)
                         ? Padding(
                             padding: const EdgeInsets.all(8.0),
                             child: Image.network(
                               equipment.imageUrl!,
                               fit: BoxFit.contain,
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
+                              loadingBuilder: (context, child, loadingProgress) {
                                 if (loadingProgress == null) return child;
-                                return const Center(
-                                  child: CircularProgressIndicator(),
-                                );
+                                return const Center(child: CircularProgressIndicator());
                               },
                               errorBuilder: (context, error, stackTrace) {
                                 return Icon(
@@ -348,17 +473,14 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
                     top: 12,
                     right: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: isAvailable ? Colors.green : Colors.red,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         isAvailable ? 'Available' : 'Borrowed',
-                        style: const TextStyle(
+                        style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
@@ -381,7 +503,7 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
                   Flexible(
                     child: Text(
                       equipment.name,
-                      style: const TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -393,7 +515,7 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
                   Flexible(
                     child: Text(
                       specsString,
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      style: GoogleFonts.poppins(color: Colors.grey[600], fontSize: 12),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -404,54 +526,6 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
           ),
         ],
       ),
-    );
-  }
-}
-
-// Equipment class remains the same
-class Equipment {
-  final int equipmentId;
-  final String name;
-  final String? model;
-  final String? brand;
-  final int categoryId;
-  final String categoryName;
-  final String qrCode;
-  final String? description;
-  final Map<String, dynamic> specifications;
-  final String status;
-  final String? imageUrl;
-
-  Equipment({
-    required this.equipmentId,
-    required this.name,
-    this.model,
-    this.brand,
-    required this.categoryId,
-    required this.categoryName,
-    required this.qrCode,
-    this.description,
-    required this.specifications,
-    required this.status,
-    this.imageUrl,
-  });
-
-  factory Equipment.fromMap(Map<String, dynamic> map) {
-    return Equipment(
-      equipmentId: map['equipment_id'],
-      name: map['name'],
-      model: map['model'],
-      brand: map['brand'],
-      categoryId: map['category_id'],
-      categoryName:
-          map['equipment_categories']?['category_name'] ?? 'Uncategorized',
-      qrCode: map['qr_code'],
-      description: map['description'],
-      specifications: (map['specifications'] is Map<String, dynamic>)
-          ? map['specifications']
-          : {},
-      status: map['status'],
-      imageUrl: map['image_url'],
     );
   }
 }
