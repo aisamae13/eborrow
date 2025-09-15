@@ -39,11 +39,25 @@ class _LoginPageState extends State<LoginPage> {
       final Session? session = data.session;
 
       if (event == AuthChangeEvent.signedIn && session != null && mounted) {
-        // User successfully signed in, navigate to home
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const BottomNav()),
-          (route) => false,
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Login successful!'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
         );
+
+        // Add a small delay to show the success message before navigation
+        Timer(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            // User successfully signed in, navigate to home
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const BottomNav()),
+              (route) => false,
+            );
+          }
+        });
       }
     });
   }
@@ -67,17 +81,14 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final response = await supabase.auth.signInWithPassword(
+      await supabase.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      if (response.user != null && mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const BottomNav()),
-          (route) => false,
-        );
-      }
+      // The success message and navigation will be handled by the auth listener
+      // No need to navigate here since the auth listener will handle it
+
     } on AuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

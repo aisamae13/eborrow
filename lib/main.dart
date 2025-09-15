@@ -58,6 +58,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       if (data.event == AuthChangeEvent.signedIn) {
         debugPrint('User successfully signed in via ${data.session?.user.appMetadata['provider'] ?? 'email'}');
       }
+
+      // Handle password recovery event
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        debugPrint('Password recovery event detected');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (navigatorKey.currentState != null) {
+            navigatorKey.currentState!.pushNamed('/create-password');
+          }
+        });
+      }
     });
 
     // Handle OAuth redirect for web only
@@ -105,9 +115,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         debugPrint('Found OAuth tokens in URL, processing...');
         await supabase.auth.getSessionFromUrl(uri);
       }
+
+      // Check for password recovery tokens in URL
+      if (uri.fragment.contains('type=recovery') || uri.queryParameters.containsKey('type')) {
+        final type = uri.queryParameters['type'] ?? uri.fragment.split('type=')[1].split('&')[0];
+        if (type == 'recovery') {
+          debugPrint('Found password recovery token in URL, processing...');
+          await supabase.auth.getSessionFromUrl(uri);
+          // Navigation will be handled by the auth state listener
+        }
+      }
     } catch (e) {
       // Log errors for debugging
-      debugPrint('OAuth redirect error: $e');
+      debugPrint('OAuth/Password recovery redirect error: $e');
     }
   }
 
@@ -138,6 +158,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           }
 
           final session = snapshot.data?.session;
+
+          // Handle password recovery separately
+          if (snapshot.data?.event == AuthChangeEvent.passwordRecovery) {
+            debugPrint('Showing CreateNewPasswordPage for password recovery');
+            return const CreateNewPasswordPage();
+          }
 
           if (session != null) {
             debugPrint('Navigating to BottomNav for user: ${session.user.email}');

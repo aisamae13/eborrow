@@ -25,23 +25,75 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
     super.dispose();
   }
 
+  // Check individual password criteria
+  bool _hasMinLength(String password) => password.length >= 8;
+  bool _hasLowercase(String password) => RegExp(r'(?=.*[a-z])').hasMatch(password);
+  bool _hasUppercase(String password) => RegExp(r'(?=.*[A-Z])').hasMatch(password);
+  bool _hasNumber(String password) => RegExp(r'(?=.*\d)').hasMatch(password);
+
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return 'Password is required';
     }
-    if (value.length < 8) {
-      return 'Password must be at least 8 characters';
-    }
-    if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
-      return 'Password must contain at least one lowercase letter';
-    }
-    if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
-      return 'Password must contain at least one uppercase letter';
-    }
-    if (!RegExp(r'(?=.*\d)').hasMatch(value)) {
-      return 'Password must contain at least one number';
+    if (!_hasMinLength(value) || !_hasLowercase(value) || !_hasUppercase(value) || !_hasNumber(value)) {
+      return 'Please meet all password requirements below';
     }
     return null;
+  }
+
+  Widget _buildPasswordCriteria() {
+    final password = _passwordController.text;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Password Requirements:',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF2E4F7A),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildCriteriaItem('At least 8 characters', _hasMinLength(password)),
+          _buildCriteriaItem('One lowercase letter', _hasLowercase(password)),
+          _buildCriteriaItem('One uppercase letter', _hasUppercase(password)),
+          _buildCriteriaItem('One number', _hasNumber(password)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCriteriaItem(String text, bool isMet) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(
+            isMet ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 16,
+            color: isMet ? Colors.green : Colors.grey,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              color: isMet ? Colors.green : Colors.grey[600],
+              fontWeight: isMet ? FontWeight.w500 : FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _updatePassword() async {
@@ -137,6 +189,7 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
                     controller: _passwordController,
                     obscureText: !_isPasswordVisible,
                     validator: _validatePassword,
+                    onChanged: (value) => setState(() {}), // Trigger rebuild to update criteria
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: Colors.grey[200],
@@ -158,6 +211,11 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 16),
+
+                  // Password criteria display
+                  _buildPasswordCriteria(),
+
                   const SizedBox(height: 24),
 
                   Text(

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Add this import
-import 'main.dart'; // Add this import
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'main.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -54,7 +55,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         );
       } else {
         // Step 3: If the email exists, proceed with sending the reset link.
-        await supabase.auth.resetPasswordForEmail(email);
+        await supabase.auth.resetPasswordForEmail(
+          email,
+          redirectTo: kIsWeb
+            ? 'http://localhost:3000/#/create-password'  // For web development
+            : 'eborrow://create-password',  // For mobile
+        );
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
