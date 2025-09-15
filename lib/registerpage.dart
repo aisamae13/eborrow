@@ -24,6 +24,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isLoading = false;
   bool _acceptPrivacyPolicy = false;
   bool _acceptTermsConditions = false;
+  bool _isCheckingDuplicates = false;
 
   @override
   void dispose() {
@@ -56,13 +57,50 @@ class _RegisterPageState extends State<RegisterPage> {
     return null;
   }
 
-  // Validation functions (including the new one for Student ID)
+  // Enhanced Student ID validation with duplication check
   String? _validateStudentId(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Student ID is required';
     }
+
+    // Basic format validation (customize based on your student ID format)
+    final studentId = value.trim();
+    if (studentId.length < 6) {
+      return 'Student ID must be at least 6 characters';
+    }
+
     return null;
   }
+
+  // Function to check if student ID and email already exist
+  Future<Map<String, bool>> _checkDuplicates(String studentId, String email) async {
+  try {
+    Map<String, bool> duplicates = {
+      'studentIdExists': false,
+      'emailExists': false,
+    };
+
+    // Only check user_profiles table - remove auth.users query
+    final profileResponse = await supabase
+        .from('user_profiles')
+        .select('student_id, email')
+        .or('student_id.eq.${studentId.trim()},email.eq.${email.trim()}');
+
+    for (var profile in profileResponse) {
+      if (profile['student_id'] == studentId.trim()) {
+        duplicates['studentIdExists'] = true;
+      }
+      if (profile['email'] == email.trim()) {
+        duplicates['emailExists'] = true;
+      }
+    }
+
+    return duplicates;
+  } catch (e) {
+    print('Error checking duplicates: $e');
+    return {'studentIdExists': false, 'emailExists': false};
+  }
+}
 
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
@@ -76,29 +114,32 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Password is required';
-    }
-
-    final List<String> errors = [];
-
-    if (value.length < 8) {
-      errors.add('At least 8 characters');
-    }
-    if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
-      errors.add('At least one lowercase letter');
-    }
-    if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
-      errors.add('At least one uppercase letter');
-    }
-    if (!RegExp(r'(?=.*\d)').hasMatch(value)) {
-      errors.add('At least one number');
-    }
-    if (errors.isNotEmpty) {
-      return 'Password must contain:\n\u2022 ${errors.join('\n\u2022 ')}';
-    }
-    return null;
+  if (value == null || value.isEmpty) {
+    return 'Password is required';
   }
+
+  final List<String> errors = [];
+
+  if (value.length < 8) {
+    errors.add('At least 8 characters');
+  }
+  if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
+    errors.add('At least one lowercase letter');
+  }
+  if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
+    errors.add('At least one uppercase letter');
+  }
+  if (!RegExp(r'(?=.*\d)').hasMatch(value)) {
+    errors.add('At least one number');
+  }
+  if (!RegExp(r'(?=.*[!@#$%^&*(),.?":{}|<>])').hasMatch(value)) {
+    errors.add('At least one special character (!@#\$%^&*(),.?\":{}\|<>)');
+  }
+  if (errors.isNotEmpty) {
+    return 'Password must contain:\n\u2022 ${errors.join('\n\u2022 ')}';
+  }
+  return null;
+}
 
   String? _validateConfirmPassword(String? value) {
     if (value == null || value.isEmpty) {
@@ -124,49 +165,127 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _handleSignUp() async {
-    if (_formKey.currentState!.validate() && _validateConsents()) {
+    // First validate the form
+    if (!_formKey.currentState!.validate() || !_validateConsents()) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _isCheckingDuplicates = true;
+    });
+
+    try {
+      // Check for duplicate student ID and email before proceeding
+      final duplicates = await _checkDuplicates(
+        _studentIdController.text.trim(),
+        _emailController.text.trim(),
+      );
+
+      if (duplicates['studentIdExists']! || duplicates['emailExists']!) {
+        if (mounted) {
+          setState(() {
+            _isCheckingDuplicates = false;
+          });
+
+          String errorMessage = '';
+          if (duplicates['studentIdExists']! && duplicates['emailExists']!) {
+            errorMessage = 'Both Student ID and Email are already registered. Please use different credentials.';
+          } else if (duplicates['studentIdExists']!) {
+            errorMessage = 'This Student ID is already registered. Please use a different Student ID.';
+          } else if (duplicates['emailExists']!) {
+            errorMessage = 'This Email is already registered. Please use a different Email.';
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
       setState(() {
-        _isLoading = true;
+        _isCheckingDuplicates = false;
       });
 
-      try {
-        final response = await supabase.auth.signUp(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-          // 2. ADDED student_id to the data sent to Supabase
-          data: {
+      // If both student ID and email are unique, proceed with registration
+      final response = await supabase.auth.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        data: {
+          'first_name': _firstNameController.text.trim(),
+          'last_name': _lastNameController.text.trim(),
+          'student_id': _studentIdController.text.trim(),
+          'privacy_consent': _acceptPrivacyPolicy,
+          'terms_consent': _acceptTermsConditions,
+          'consent_timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+
+      if (response.user != null && mounted) {
+        // Insert user profile data into user_profiles table
+        try {
+          await supabase.from('user_profiles').insert({
+            'id': response.user!.id, // Link to auth user
             'first_name': _firstNameController.text.trim(),
             'last_name': _lastNameController.text.trim(),
             'student_id': _studentIdController.text.trim(),
-            'privacy_consent': _acceptPrivacyPolicy,
-            'terms_consent': _acceptTermsConditions,
-            'consent_timestamp': DateTime.now().toIso8601String(),
-          },
-        );
-
-        if (response.user != null && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Success! Please check your email for a confirmation link.',
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.of(context).pop();
-        }
-      } on AuthException catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.message), backgroundColor: Colors.red),
-          );
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
+            'email': _emailController.text.trim(),
+            'created_at': DateTime.now().toIso8601String(),
           });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Success! Please check your email for a confirmation link.',
+                ),
+                backgroundColor: Colors.green,
+              ),
+            );
+            Navigator.of(context).pop();
+          }
+        } catch (profileError) {
+          // If profile creation fails, show error but don't prevent navigation
+          // since the user account was created successfully
+          print('Error creating user profile: $profileError');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Account created but profile setup incomplete. Please contact support.',
+                ),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            Navigator.of(context).pop();
+          }
         }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An error occurred: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isCheckingDuplicates = false;
+        });
       }
     }
   }
@@ -340,7 +459,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     const SizedBox(height: 20),
 
-                    // LAST NAME FIELD (Added this back)
+                    // Last Name Field
                     Text(
                       'Last Name',
                       style: GoogleFonts.poppins(color: Colors.black54),
@@ -376,7 +495,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     const SizedBox(height: 20),
 
-                    // STUDENT ID FIELD (Corrected)
+                    // Student ID Field
                     Text(
                       'Student ID',
                       style: GoogleFonts.poppins(color: Colors.black54),
@@ -668,12 +787,26 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ),
                       child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                              ),
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(color: Colors.white),
+                                ),
+                                if (_isCheckingDuplicates) ...[
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'Checking credentials...',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             )
                           : Text(
                               'Sign up',
@@ -709,7 +842,7 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  // Add this helper function below your build method
+  // Helper function for input decoration
   InputDecoration _buildInputDecoration(String hintText) {
     return InputDecoration(
       filled: true,

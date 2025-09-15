@@ -17,6 +17,8 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
   bool _isLoading = false;
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
+  bool _hasSpecialChar(String password) => RegExp(r'(?=.*[!@#$%^&*(),.?":{}|<>])').hasMatch(password);
+
 
   @override
   void dispose() {
@@ -31,70 +33,89 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
   bool _hasUppercase(String password) => RegExp(r'(?=.*[A-Z])').hasMatch(password);
   bool _hasNumber(String password) => RegExp(r'(?=.*\d)').hasMatch(password);
 
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Password is required';
-    }
-    if (!_hasMinLength(value) || !_hasLowercase(value) || !_hasUppercase(value) || !_hasNumber(value)) {
-      return 'Please meet all password requirements below';
-    }
-    return null;
+ String? _validatePassword(String? value) {
+  if (value == null || value.isEmpty) {
+    return 'Password is required';
   }
+  if (!_hasMinLength(value) || !_hasLowercase(value) || !_hasUppercase(value) || !_hasNumber(value) || !_hasSpecialChar(value)) {
+    return 'Please meet all password requirements below';
+  }
+  return null;
+}
 
-  Widget _buildPasswordCriteria() {
-    final password = _passwordController.text;
+ Widget _buildPasswordCriteria() {
+  final password = _passwordController.text;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Password Requirements:',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF2E4F7A),
-            ),
+  return Container(
+    width: double.infinity,
+    padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04), // Responsive padding
+    decoration: BoxDecoration(
+      color: Colors.grey[100],
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.grey[300]!),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Password Requirements:',
+          style: GoogleFonts.poppins(
+            fontSize: MediaQuery.of(context).size.width * 0.035, // Responsive font size
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF2E4F7A),
           ),
-          const SizedBox(height: 8),
-          _buildCriteriaItem('At least 8 characters', _hasMinLength(password)),
-          _buildCriteriaItem('One lowercase letter', _hasLowercase(password)),
-          _buildCriteriaItem('One uppercase letter', _hasUppercase(password)),
-          _buildCriteriaItem('One number', _hasNumber(password)),
-        ],
-      ),
-    );
-  }
+        ),
+        SizedBox(height: MediaQuery.of(context).size.height * 0.01), // Responsive spacing
+
+        // Use Wrap for better responsiveness on smaller screens
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            _buildCriteriaItem('At least 8 characters', _hasMinLength(password)),
+            _buildCriteriaItem('One lowercase letter', _hasLowercase(password)),
+            _buildCriteriaItem('One uppercase letter', _hasUppercase(password)),
+            _buildCriteriaItem('One number', _hasNumber(password)),
+            _buildCriteriaItem('One special character (!@#\$%^&*...)', _hasSpecialChar(password)),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildCriteriaItem(String text, bool isMet) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Icon(
-            isMet ? Icons.check_circle : Icons.radio_button_unchecked,
-            size: 16,
-            color: isMet ? Colors.green : Colors.grey,
-          ),
-          const SizedBox(width: 8),
-          Text(
+  return Container(
+    width: double.infinity, // Take full width for each item
+    padding: EdgeInsets.symmetric(
+      vertical: MediaQuery.of(context).size.height * 0.003, // Responsive vertical padding
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          isMet ? Icons.check_circle : Icons.radio_button_unchecked,
+          size: MediaQuery.of(context).size.width * 0.04, // Responsive icon size
+          color: isMet ? Colors.green : Colors.grey,
+        ),
+        SizedBox(width: MediaQuery.of(context).size.width * 0.02), // Responsive spacing
+        Expanded( // Use Expanded to prevent overflow on small screens
+          child: Text(
             text,
             style: GoogleFonts.poppins(
-              fontSize: 13,
+              fontSize: MediaQuery.of(context).size.width * 0.032, // Responsive font size
               color: isMet ? Colors.green : Colors.grey[600],
               fontWeight: isMet ? FontWeight.w500 : FontWeight.w400,
             ),
+            maxLines: 2, // Allow text to wrap if needed
+            overflow: TextOverflow.ellipsis,
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
+
 
   Future<void> _updatePassword() async {
     if (!_formKey.currentState!.validate()) {
@@ -260,35 +281,37 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
                   const SizedBox(height: 32),
 
                   SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _updatePassword,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2B326B),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.0),
-                        ),
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _updatePassword,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2B326B),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.0),
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              'Update Password',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
                     ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            'Update Password',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
+                ),
+                // Add responsive bottom spacing
+                SizedBox(height: MediaQuery.of(context).viewPadding.bottom + 24),
                 ],
               ),
             ),
