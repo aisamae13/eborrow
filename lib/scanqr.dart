@@ -81,7 +81,7 @@ class _ScanQRPageState extends State<ScanQRPage> with WidgetsBindingObserver {
         title: const Text(
           'QR Scanner',
           style: TextStyle(
-            fontSize: 22,
+            fontSize: 24,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'main.dart';
 import 'models/borrow_request.dart';
-import 'package:eborrow/utils/string_extension.dart'; // <--- Tiyakin na TAMA ang path na ito
-import 'modify_request_page.dart'; // <-- NEW: Import the modify page
+import 'package:eborrow/utils/string_extension.dart';
+import 'modify_request_page.dart';
+import 'notifications/notification_service.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -12,9 +14,29 @@ class HistoryPage extends StatefulWidget {
   State<HistoryPage> createState() => _HistoryPageState();
 }
 
-class _HistoryPageState extends State<HistoryPage> {
+class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin {
   int _selectedIndex = 0;
   Future<List<BorrowRequest>>? _requestsFuture;
+
+  late PageController _pageController;
+  late AnimationController _animationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _animationController.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -60,10 +82,26 @@ class _HistoryPageState extends State<HistoryPage> {
     });
   }
 
-  // ----------------- NEW FUNCTION -----------------
-  // Handles the logic for cancelling a request
+  void _onTabSelected(int index) {
+    if (_selectedIndex != index) {
+      setState(() {
+        _selectedIndex = index;
+      });
+
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+
+      _animationController.forward().then((_) {
+        _animationController.reset();
+      });
+    }
+  }
+
+  // Updated to use notification system
   Future<void> _cancelRequest(BorrowRequest request) async {
-    // Show a confirmation dialog first
     final bool? confirm = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -86,6 +124,20 @@ class _HistoryPageState extends State<HistoryPage> {
 
     if (confirm == true) {
       try {
+        // Create notification for the cancellation
+        await NotificationService.createNotification(
+          userId: request.borrowerId,
+          title: 'Request Cancelled',
+          message: 'You have cancelled your borrow request for "${request.equipmentName}".',
+          type: NotificationType.general,
+          metadata: {
+            'equipment_name': request.equipmentName,
+            'borrow_request_id': request.requestId,
+            'action': 'cancelled_by_user',
+          },
+        );
+
+        // Update the request status
         await supabase
             .from('borrow_requests')
             .update({'status': 'cancelled'})
@@ -98,7 +150,7 @@ class _HistoryPageState extends State<HistoryPage> {
               backgroundColor: Colors.green,
             ),
           );
-          _refreshData(); // Refresh the list to show the change
+          _refreshData();
         }
       } catch (e) {
         if (mounted) {
@@ -112,7 +164,6 @@ class _HistoryPageState extends State<HistoryPage> {
       }
     }
   }
-  // --------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -142,34 +193,42 @@ class _HistoryPageState extends State<HistoryPage> {
                   );
                 }
 
-                // Filter the requests into active and history lists
+                // Clear status categorization
                 final activeItems = allRequests
-                    .where(
-                      (r) => [
-                        'pending',
-                        'approved',
-                        'active',
-                        'overdue',
-                      ].contains(r.status.toLowerCase()),
-                    )
+                    .where((r) => [
+                      'pending',    // Waiting for approval
+                      'approved',   // Approved, ready for pickup
+                      'active',     // Currently borrowed
+                      'overdue',    // Past due date
+                    ].contains(r.status.toLowerCase()))
                     .toList();
 
                 final historyItems = allRequests
-                    .where(
-                      (r) => [
-                        'returned',
-                        'rejected',
-                        'cancelled',
-                        'expired',
-                      ].contains(r.status.toLowerCase()),
-                    )
+                    .where((r) => [
+                      'returned',   // Successfully returned
+                      'rejected',   // Denied by admin
+                      'cancelled',  // Cancelled by user
+                      'expired',    // Request expired (optional)
+                    ].contains(r.status.toLowerCase()))
                     .toList();
 
-                return RefreshIndicator(
-                  onRefresh: _refreshData,
-                  child: _selectedIndex == 0
-                      ? _buildItemsList(activeItems)
-                      : _buildItemsList(historyItems),
+                return PageView(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _selectedIndex = index;
+                    });
+                  },
+                  children: [
+                    RefreshIndicator(
+                      onRefresh: _refreshData,
+                      child: _buildItemsList(activeItems),
+                    ),
+                    RefreshIndicator(
+                      onRefresh: _refreshData,
+                      child: _buildItemsList(historyItems),
+                    ),
+                  ],
                 );
               },
             ),
@@ -212,8 +271,9 @@ class _HistoryPageState extends State<HistoryPage> {
       children: [
         Expanded(
           child: GestureDetector(
-            onTap: () => setState(() => _selectedIndex = 0),
-            child: Container(
+            onTap: () => _onTabSelected(0),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               decoration: BoxDecoration(
                 border: Border(
@@ -226,14 +286,16 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
               ),
               child: Center(
-                child: Text(
-                  'Active',
-                  style: TextStyle(
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: GoogleFonts.poppins(
                     color: _selectedIndex == 0
                         ? Colors.white
                         : Colors.white.withOpacity(0.6),
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 16,
                   ),
+                  child: const Text('Active'),
                 ),
               ),
             ),
@@ -241,8 +303,9 @@ class _HistoryPageState extends State<HistoryPage> {
         ),
         Expanded(
           child: GestureDetector(
-            onTap: () => setState(() => _selectedIndex = 1),
-            child: Container(
+            onTap: () => _onTabSelected(1),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               decoration: BoxDecoration(
                 border: Border(
@@ -255,14 +318,16 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
               ),
               child: Center(
-                child: Text(
-                  'History',
-                  style: TextStyle(
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: GoogleFonts.poppins(
                     color: _selectedIndex == 1
                         ? Colors.white
                         : Colors.white.withOpacity(0.6),
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 16,
                   ),
+                  child: const Text('History'),
                 ),
               ),
             ),
@@ -316,13 +381,12 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  // ----------------- MODIFIED WIDGET -----------------
   Widget _buildBorrowedItemCard(BorrowRequest item) {
     final statusColor = item.getStatusColor();
     final dateTimeFormatter = DateFormat('MMM dd, yyyy hh:mm a');
 
-    // Check if the item is pending to conditionally show buttons
     final isPending = item.status.toLowerCase() == 'pending';
+    String statusDescription = _getStatusDescription(item.status.toLowerCase());
 
     return Container(
       padding: const EdgeInsets.all(16.0),
@@ -365,7 +429,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   borderRadius: BorderRadius.circular(12.0),
                 ),
                 child: Text(
-                  item.status.capitalize(),
+                  _getDisplayStatus(item.status),
                   style: TextStyle(
                     color: statusColor,
                     fontWeight: FontWeight.bold,
@@ -375,27 +439,33 @@ class _HistoryPageState extends State<HistoryPage> {
               ),
             ],
           ),
+
           const SizedBox(height: 8),
+
+          // Status description
+          if (statusDescription.isNotEmpty)
+            Text(
+              statusDescription,
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+
+          if (statusDescription.isNotEmpty) const SizedBox(height: 4),
+
           Text(
-            'Borrowed: ${dateTimeFormatter.format(item.borrowDate)}',
+            'Requested: ${dateTimeFormatter.format(item.borrowDate)}',
             style: TextStyle(color: Colors.grey[600], fontSize: 12),
           ),
-          const SizedBox(height: 4),
-          Text(
-            // Itong linya ang kailangan ding i-capitalize
-            item.status.toLowerCase() == 'returned'
-                ? 'Returned: ${dateTimeFormatter.format(item.returnDate)}'
-                      .capitalize()
-                : 'Due: ${dateTimeFormatter.format(item.returnDate)}'
-                      .capitalize(),
-            style: TextStyle(
-              color: statusColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-          ),
 
-          // --- NEW: Conditional button section ---
+          const SizedBox(height: 4),
+
+          // Show different date info based on status
+          _buildDateInfo(item, dateTimeFormatter, statusColor),
+
+          // Conditional buttons for pending requests only
           if (isPending) ...[
             const Divider(height: 24),
             Row(
@@ -404,15 +474,13 @@ class _HistoryPageState extends State<HistoryPage> {
                 OutlinedButton.icon(
                   icon: const Icon(Icons.edit, size: 16),
                   label: const Text('Modify'),
-                  // MODIFIED LOGIC HERE
                   onPressed: item.modificationCount >= 3
                       ? null
                       : () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  ModifyRequestPage(request: item),
+                              builder: (context) => ModifyRequestPage(request: item),
                             ),
                           ).then((_) {
                             _refreshData();
@@ -420,7 +488,7 @@ class _HistoryPageState extends State<HistoryPage> {
                         },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.blue.shade700,
-                    side: BorderSide(color: Colors.blue.shade700),
+                    side: BorderSide(color: const Color.fromARGB(255, 168, 168, 168)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -445,5 +513,106 @@ class _HistoryPageState extends State<HistoryPage> {
         ],
       ),
     );
+  }
+
+  // Helper methods
+  String _getStatusDescription(String status) {
+    switch (status) {
+      case 'pending':
+        return 'Waiting for admin approval';
+      case 'approved':
+        return 'Approved - Ready for pickup';
+      case 'active':
+        return 'Currently borrowed by you';
+      case 'overdue':
+        return 'Past due date - Please return immediately';
+      case 'returned':
+        return 'Successfully returned';
+      case 'rejected':
+        return 'Request denied by admin';
+      case 'cancelled':
+        return 'Cancelled by you';
+      case 'expired':
+        return 'Request expired';
+      default:
+        return '';
+    }
+  }
+
+  String _getDisplayStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'Pending';
+      case 'approved':
+        return 'Approved';
+      case 'active':
+        return 'Active';
+      case 'overdue':
+        return 'Overdue';
+      case 'returned':
+        return 'Returned';
+      case 'rejected':
+        return 'Rejected';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'expired':
+        return 'Expired';
+      default:
+        return status.capitalize();
+    }
+  }
+
+  Widget _buildDateInfo(BorrowRequest item, DateFormat formatter, Color statusColor) {
+    switch (item.status.toLowerCase()) {
+      case 'pending':
+      case 'approved':
+        return Text(
+          'Due date: ${formatter.format(item.returnDate)}',
+          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+        );
+
+      case 'active':
+        return Text(
+          'Due: ${formatter.format(item.returnDate)}',
+          style: TextStyle(
+            color: statusColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        );
+
+      case 'overdue':
+        return Text(
+          'Was due: ${formatter.format(item.returnDate)}',
+          style: TextStyle(
+            color: Colors.red,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        );
+
+      case 'returned':
+        return Text(
+          'Returned: ${formatter.format(item.returnDate)}',
+          style: TextStyle(
+            color: Colors.green,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        );
+
+      case 'rejected':
+      case 'cancelled':
+        return Text(
+          'Date: ${formatter.format(item.borrowDate)}',
+          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+        );
+
+      default:
+        return Text(
+          'Due: ${formatter.format(item.returnDate)}',
+          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+        );
+    }
   }
 }

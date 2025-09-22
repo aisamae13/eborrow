@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart'; // Add this import
 import 'main.dart';
 import 'profile_page.dart';
-
+import 'notifications/notification_page.dart';
+import 'notifications/notification_with_badge.dart';
+import 'notifications/notification_service.dart'; // Add this import
 
 class HomePage extends StatefulWidget {
   final Function(int) onNavigate;
@@ -21,13 +25,24 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // Use the single, more complete method to load user data
     _loadUserDataAndCheckProfile();
-    // Initialize the futures
+    _initializeNotifications(); // Add this line
     _recentActivityFuture = _fetchRecentActivity();
     _categoriesFuture = _fetchCategories();
   }
 
+  // Add this method to initialize notifications
+  void _initializeNotifications() {
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      // Initialize the notification provider with real-time subscriptions
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<NotificationProvider>().initializeRealtime(user.id);
+      });
+    }
+  }
+
+  // Rest of your existing methods remain the same...
   Future<void> _loadUserDataAndCheckProfile() async {
     final user = supabase.auth.currentUser;
     if (user == null) return;
@@ -60,157 +75,127 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<List<BorrowRequest>> _fetchRecentActivity() async {
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) return [];
-    try {
-      final response = await supabase
-          .from('borrow_requests')
-          .select('*, equipment(name, brand, image_url)')
-          .eq('borrower_id', userId)
-          .order('created_at', ascending: false)
-          .limit(2);
-      return response.map((map) => BorrowRequest.fromMap(map)).toList();
-    } catch (e) {
-      // Silently fail is okay for a summary view
-      return [];
-    }
-  }
-
-  Future<List<EquipmentCategory>> _fetchCategories() async {
-    try {
-      final categoriesResponse = await supabase.from('equipment_categories').select();
-      final categories = categoriesResponse.map((map) {
-        return EquipmentCategory(
-          id: map['category_id'],
-          name: map['category_name'],
-        );
-      }).toList();
-
-      final equipmentResponse = await supabase
-          .from('equipment')
-          .select('category_id')
-          .ilike('status', 'available');
-
-      for (var category in categories) {
-        final count = equipmentResponse
-            .where((item) => item['category_id'] == category.id)
-            .length;
-        category.availableCount = count;
-      }
-      return categories;
-    } catch (e) {
-      return [];
-    }
-  }
-
-
   @override
-  @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      automaticallyImplyLeading: false,
-      title: const Text(
-        'Borrower',
-        style: TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: Text(
+          'Borrower',
+          style: GoogleFonts.poppins(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
-      ),
-      backgroundColor: const Color(0xFF2B326B),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.person_outline, color: Colors.white),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ProfilePage()),
-            );
-          },
-        ),
-        const SizedBox(width: 8),
-      ],
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(4.0),
-        child: Container(color: const Color(0xFFFFC107), height: 4.0),
-      ),
-    ),
-    body: SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildWelcomeCard(_userName),
-            if (_showStudentIdBanner) _buildStudentIdBanner(),
-            const SizedBox(height: 24),
-            _buildSectionHeader('Quick Actions'),
-            const SizedBox(height: 16),
-            _buildQuickActions(context),
-            const SizedBox(height: 24),
-            _buildSectionHeader('Equipment Categories'),
-            const SizedBox(height: 16),
-            FutureBuilder<List<EquipmentCategory>>(
-              future: _categoriesFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return const Center(child: Text('Error loading categories.'));
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('No categories available.'));
-                } else {
-                  return _buildCategoryGrid(snapshot.data!);
-                }
-              },
-            ),
-            const SizedBox(height: 24),
-            _buildSectionHeader('Recent Activity'),
-            const SizedBox(height: 16),
-                      FutureBuilder<List<BorrowRequest>>(
-            future: _recentActivityFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              } else if (snapshot.hasError) {
-                return const Center(
-                  child: Text('Error loading recent activity.'),
-                );
-              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                // Add a SizedBox to create space below the text
-                return const Column(
-                  children: [
-                    Center(
-                      child: Text('No recent activity to show.'),
-                    ),
-                    SizedBox(height: 24),
-                  ],
-                );
-              } else {
-                return Column(
-                  children: [
-                    ...snapshot.data!
-                        .map((item) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12.0),
-                              child: _buildRecentActivityItem(item),
-                            ))
-                        .toList(),
-                    const SizedBox(height: 24),
-                  ],
-                );
-              }
+        backgroundColor: const Color(0xFF2B326B),
+        actions: [
+          // Update this to use the correct widget name
+          RealtimeNotificationBadge(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const NotificationPage()),
+              );
             },
           ),
-          ],
+          const SizedBox(width: 12),
+          IconButton(
+            icon: const Icon(
+              Icons.person_outline,
+              color: Colors.white,
+              size: 30.0,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(4.0),
+          child: Container(color: const Color(0xFFFFC107), height: 4.0),
         ),
       ),
-    ),
-  );
-}
+      // Rest of your build method remains the same...
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildWelcomeCard(_userName),
+              if (_showStudentIdBanner) _buildStudentIdBanner(),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Quick Actions'),
+              const SizedBox(height: 16),
+              _buildQuickActions(context),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Equipment Categories'),
+              const SizedBox(height: 16),
+              FutureBuilder<List<EquipmentCategory>>(
+                future: _categoriesFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return const Center(child: Text('Error loading categories.'));
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(child: Text('No categories available.'));
+                  } else {
+                    return _buildCategoryGrid(snapshot.data!);
+                  }
+                },
+              ),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Recent Activity'),
+              const SizedBox(height: 16),
+              FutureBuilder<List<BorrowRequest>>(
+                future: _recentActivityFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return const Center(
+                      child: Text('Error loading recent activity.'),
+                    );
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Column(
+                      children: [
+                        Center(
+                          child: Text('No recent activity to show.'),
+                        ),
+                        SizedBox(height: 24),
+                      ],
+                    );
+                  } else {
+                    return Column(
+                      children: [
+                        ...snapshot.data!
+                            .map((item) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12.0),
+                                  child: _buildRecentActivityItem(item),
+                                ))
+                            .toList(),
+                        const SizedBox(height: 24),
+                      ],
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-  // New banner widget to prompt user for student ID
+  // All your existing widget building methods remain the same...
+  // (keeping them for completeness but they don't need changes)
+
   Widget _buildStudentIdBanner() {
     return Container(
       width: double.infinity,
@@ -492,10 +477,61 @@ Widget build(BuildContext context) {
       ),
     );
   }
+
+  Future<List<BorrowRequest>> _fetchRecentActivity() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+    try {
+      final response = await supabase
+          .from('borrow_requests')
+          .select('*, equipment(name, brand, image_url)')
+          .eq('borrower_id', userId)
+          .order('created_at', ascending: false)
+          .limit(2);
+      return response.map((map) => BorrowRequest.fromMap(map)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<List<EquipmentCategory>> _fetchCategories() async {
+    try {
+      final categoriesResponse = await supabase.from('equipment_categories').select();
+      final categories = categoriesResponse.map((map) {
+        return EquipmentCategory(
+          id: map['category_id'],
+          name: map['category_name'],
+        );
+      }).toList();
+
+      final equipmentResponse = await supabase
+          .from('equipment')
+          .select('category_id')
+          .ilike('status', 'available');
+
+      for (var category in categories) {
+        final count = equipmentResponse
+            .where((item) => item['category_id'] == category.id)
+            .length;
+        category.availableCount = count;
+      }
+      return categories;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Add dispose method to clean up notifications
+  @override
+  void dispose() {
+    // Clean up the notification provider when the homepage is disposed
+    final notificationProvider = context.read<NotificationProvider>();
+    notificationProvider.dispose();
+    super.dispose();
+  }
 }
 
-// Make sure to define these models in separate files as per the original imports.
-// Example: models/borrow_request.dart
+// Keep your existing model classes
 class BorrowRequest {
   final int borrowId;
   final String borrowerId;
@@ -540,7 +576,6 @@ class BorrowRequest {
   }
 }
 
-// Example: models/equipment_category.dart
 class EquipmentCategory {
   final int id;
   final String name;

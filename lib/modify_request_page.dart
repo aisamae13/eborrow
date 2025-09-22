@@ -1,3 +1,4 @@
+import 'package:eborrow/notifications/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -20,14 +21,13 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
   late DateTime _borrowDate;
   late DateTime _returnDate;
 
-
-@override
-void initState() {
-  super.initState();
-  _borrowDate = DateTime.now();
-  _returnDate = widget.request.returnDate;
-  _purposeController.text = widget.request.purpose ?? '';
-}
+  @override
+  void initState() {
+    super.initState();
+    _borrowDate = DateTime.now(); // Use current time as reference
+    _returnDate = widget.request.returnDate;
+    _purposeController.text = widget.request.purpose ?? '';
+  }
 
   @override
   void dispose() {
@@ -36,30 +36,56 @@ void initState() {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-  final DateTime? pickedDate = await showDatePicker(
-    context: context,
-    initialDate: _returnDate,
-    firstDate: DateTime.now(), // FIXED: Use current time, not original borrow date
-    lastDate: DateTime.now().add(const Duration(days: 30)),
-  );
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _returnDate,
+      firstDate: DateTime.now(), // Use current time as minimum
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
 
-  if (pickedDate != null && mounted) {
-    setState(() {
-      _returnDate = DateTime(
-        pickedDate.year,
-        pickedDate.month,
-        pickedDate.day,
-        _returnDate.hour,
-        _returnDate.minute,
-      );
-    });
+    if (pickedDate != null && mounted) {
+      setState(() {
+        _returnDate = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          _returnDate.hour,
+          _returnDate.minute,
+        );
+      });
+    }
   }
-}
 
   Future<void> _selectTime(BuildContext context) async {
     final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_returnDate),
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            timePickerTheme: TimePickerThemeData(
+              // Change the background color of the AM/PM toggle
+              dayPeriodColor: WidgetStateColor.resolveWith(
+                (states) => states.contains(MaterialState.selected)
+                    ? Color(0xFF2B326B) // Selected AM/PM background color
+                    : Colors.grey[200] ??
+                          Colors.grey, // Unselected AM/PM background color
+              ),
+              // Change the text color of the AM/PM text
+              dayPeriodTextColor: MaterialStateColor.resolveWith(
+                (states) => states.contains(MaterialState.selected)
+                    ? Colors.white // Selected AM/PM text color
+                    : Colors.black, // Unselected AM/PM text color
+              ),
+              // You can also change the border color
+              dayPeriodBorderSide: BorderSide(
+                color: Color(0xFF2B326B), // Border color
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (pickedTime != null && mounted) {
@@ -75,26 +101,26 @@ void initState() {
     }
   }
 
- bool _isReturnDateValid() {
-  return _returnDate.isAfter(_borrowDate);
-}
+  bool _isReturnDateValid() {
+    return _returnDate.isAfter(_borrowDate);
+  }
 
-  Future<void> _submitModifiedRequest() async {
+ Future<void> _submitModifiedRequest() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-   if (!_isReturnDateValid()) {
-  if (mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Return date and time must be in the future.'),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
-  return;
-}
+    if (!_isReturnDateValid()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Return date and time must be in the future.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -109,6 +135,13 @@ void initState() {
             'modification_count': widget.request.modificationCount + 1,
           })
           .eq('request_id', widget.request.requestId);
+
+      if (widget.request.modificationCount >= 2) { // Will be 3 after this update
+        await NotificationService.createModificationLimitNotification(
+          userId: supabase.auth.currentUser!.id,
+          equipmentName: widget.request.equipmentName,
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -136,6 +169,7 @@ void initState() {
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

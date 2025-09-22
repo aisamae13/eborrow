@@ -130,8 +130,8 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
         title: Text(
           'Catalog',
           style: GoogleFonts.poppins(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
+           fontSize: 24,
+          fontWeight: FontWeight.w500,
             color: Colors.white,
           ),
         ),

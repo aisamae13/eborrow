@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart'; // Add this import
 import 'landingpage.dart';
 import 'loginpage.dart';
 import 'bottom_nav.dart';
 import 'createnewpasswordpage.dart';
+import 'notifications/notification_service.dart'; // Add this import
 
 // Global navigator key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -22,7 +24,16 @@ Future<void> main() async {
     debug: kDebugMode,
   );
 
-  runApp(const MyApp());
+  // Wrap the app with MultiProvider for notification management
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        // Add other providers here as needed
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 final supabase = Supabase.instance.client;
@@ -57,6 +68,29 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // Additional debugging for OAuth flow
       if (data.event == AuthChangeEvent.signedIn) {
         debugPrint('User successfully signed in via ${data.session?.user.appMetadata['provider'] ?? 'email'}');
+
+        // Initialize notifications when user signs in
+        final userId = data.session?.user.id;
+        if (userId != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final context = navigatorKey.currentContext;
+            if (context != null && context.mounted) {
+              context.read<NotificationProvider>().initializeRealtime(userId);
+            }
+          });
+        }
+      }
+
+      // Clean up notifications when user signs out
+      if (data.event == AuthChangeEvent.signedOut) {
+        debugPrint('User signed out, cleaning up notifications');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final context = navigatorKey.currentContext;
+          if (context != null && context.mounted) {
+            final provider = context.read<NotificationProvider>();
+            provider.dispose(); // This will unsubscribe from real-time updates
+          }
+        });
       }
 
       // Handle password recovery event
@@ -101,6 +135,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         final currentSession = supabase.auth.currentSession;
         if (currentSession != null) {
           debugPrint('Found existing session after app resume: ${currentSession.user.email}');
+
+          // Re-initialize notifications if needed (helpful for mobile apps that were backgrounded)
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final context = navigatorKey.currentContext;
+            if (context != null && context.mounted) {
+              context.read<NotificationProvider>().initializeRealtime(currentSession.user.id);
+            }
+          });
         }
       }
     }
