@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'main.dart';
 import 'models/borrow_request.dart';
 import 'package:eborrow/utils/string_extension.dart'; // <--- Tiyakin na TAMA ang path na ito
+import 'modify_request_page.dart'; // <-- NEW: Import the modify page
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -30,9 +31,7 @@ class _HistoryPageState extends State<HistoryPage> {
     try {
       final response = await supabase
           .from('borrow_requests')
-          .select(
-            '*, equipment(name)',
-          )
+          .select('*, equipment(name)')
           .eq('borrower_id', userId)
           .order('created_at', ascending: false);
 
@@ -44,7 +43,9 @@ class _HistoryPageState extends State<HistoryPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error fetching history. Check your connection.'),
+            content: const Text(
+              'Error fetching history. Check your connection.',
+            ),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -58,6 +59,60 @@ class _HistoryPageState extends State<HistoryPage> {
       _requestsFuture = _fetchBorrowRequests();
     });
   }
+
+  // ----------------- NEW FUNCTION -----------------
+  // Handles the logic for cancelling a request
+  Future<void> _cancelRequest(BorrowRequest request) async {
+    // Show a confirmation dialog first
+    final bool? confirm = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Cancellation'),
+        content: const Text(
+          'Are you sure you want to cancel this borrow request?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await supabase
+            .from('borrow_requests')
+            .update({'status': 'cancelled'})
+            .eq('request_id', request.requestId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Request cancelled successfully.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _refreshData(); // Refresh the list to show the change
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error cancelling request: ${e.toString()}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+  // --------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -75,9 +130,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 if (snapshot.hasError) {
                   return RefreshIndicator(
                     onRefresh: _refreshData,
-                    child: Center(
-                      child: Text('Error: ${snapshot.error}'),
-                    ),
+                    child: Center(child: Text('Error: ${snapshot.error}')),
                   );
                 }
 
@@ -107,6 +160,7 @@ class _HistoryPageState extends State<HistoryPage> {
                         'returned',
                         'rejected',
                         'cancelled',
+                        'expired',
                       ].contains(r.status.toLowerCase()),
                     )
                     .toList();
@@ -262,9 +316,13 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
+  // ----------------- MODIFIED WIDGET -----------------
   Widget _buildBorrowedItemCard(BorrowRequest item) {
     final statusColor = item.getStatusColor();
-     final dateTimeFormatter = DateFormat('MMM dd, yyyy hh:mm a');
+    final dateTimeFormatter = DateFormat('MMM dd, yyyy hh:mm a');
+
+    // Check if the item is pending to conditionally show buttons
+    final isPending = item.status.toLowerCase() == 'pending';
 
     return Container(
       padding: const EdgeInsets.all(16.0),
@@ -326,14 +384,64 @@ class _HistoryPageState extends State<HistoryPage> {
           Text(
             // Itong linya ang kailangan ding i-capitalize
             item.status.toLowerCase() == 'returned'
-                ? 'Returned: ${dateTimeFormatter.format(item.returnDate)}'.capitalize()
-                : 'Due: ${dateTimeFormatter.format(item.returnDate)}'.capitalize(),
+                ? 'Returned: ${dateTimeFormatter.format(item.returnDate)}'
+                      .capitalize()
+                : 'Due: ${dateTimeFormatter.format(item.returnDate)}'
+                      .capitalize(),
             style: TextStyle(
               color: statusColor,
               fontWeight: FontWeight.bold,
               fontSize: 12,
             ),
           ),
+
+          // --- NEW: Conditional button section ---
+          if (isPending) ...[
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.edit, size: 16),
+                  label: const Text('Modify'),
+                  // MODIFIED LOGIC HERE
+                  onPressed: item.modificationCount >= 3
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  ModifyRequestPage(request: item),
+                            ),
+                          ).then((_) {
+                            _refreshData();
+                          });
+                        },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.blue.shade700,
+                    side: BorderSide(color: Colors.blue.shade700),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  icon: const Icon(Icons.cancel_outlined, size: 16),
+                  label: const Text('Cancel'),
+                  onPressed: () => _cancelRequest(item),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.red.shade600,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

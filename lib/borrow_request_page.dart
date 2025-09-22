@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'main.dart';
 import 'models/equipment_model.dart';
+import 'request_submitted_page.dart';
+import 'models/borrow_request.dart';
 
 class BorrowRequestPage extends StatefulWidget {
   final Equipment equipment;
@@ -92,66 +94,104 @@ class _BorrowRequestPageState extends State<BorrowRequestPage> {
     }
   }
 
-Future<void> _selectTime(BuildContext context, bool isBorrowDate) async {
-  final TimeOfDay? pickedTime = await showTimePicker(
-    context: context,
-    initialTime: TimeOfDay.fromDateTime(
-      isBorrowDate ? _borrowDate : _returnDate,
-    ),
-    builder: (BuildContext context, Widget? child) {
-return Theme(
-  data: Theme.of(context).copyWith(
-    timePickerTheme: TimePickerThemeData(
-      // Change the background color of the AM/PM toggle
-      dayPeriodColor: WidgetStateColor.resolveWith((states) =>
-          states.contains(MaterialState.selected)
-              ? Color(0xFF2B326B) // Selected AM/PM background color
-              : Colors.grey[200] ?? Colors.grey, // Unselected AM/PM background color
+  Future<void> _selectTime(BuildContext context, bool isBorrowDate) async {
+    final TimeOfDay? pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(
+        isBorrowDate ? _borrowDate : _returnDate,
       ),
-            // Change the text color of the AM/PM text
-            dayPeriodTextColor: MaterialStateColor.resolveWith((states) =>
-                states.contains(MaterialState.selected)
-                ? Colors.white // Selected AM/PM text color
-                : Colors.black // Unselected AM/PM text color
-            ),
-            // You can also change the border color
-            dayPeriodBorderSide: BorderSide(
-              color: Color(0xFF2B326B), // Border color
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            timePickerTheme: TimePickerThemeData(
+              // Change the background color of the AM/PM toggle
+              dayPeriodColor: WidgetStateColor.resolveWith(
+                (states) => states.contains(MaterialState.selected)
+                    ? Color(0xFF2B326B) // Selected AM/PM background color
+                    : Colors.grey[200] ??
+                          Colors.grey, // Unselected AM/PM background color
+              ),
+              // Change the text color of the AM/PM text
+              dayPeriodTextColor: MaterialStateColor.resolveWith(
+                (states) => states.contains(MaterialState.selected)
+                    ? Colors
+                          .white // Selected AM/PM text color
+                    : Colors.black, // Unselected AM/PM text color
+              ),
+              // You can also change the border color
+              dayPeriodBorderSide: BorderSide(
+                color: Color(0xFF2B326B), // Border color
+              ),
             ),
           ),
-        ),
-        child: child!,
-      );
-    },
-  );
+          child: child!,
+        );
+      },
+    );
 
-  if (pickedTime != null) {
-    if (mounted) {
-      setState(() {
-        if (isBorrowDate) {
-          _borrowDate = DateTime(
-            _borrowDate.year,
-            _borrowDate.month,
-            _borrowDate.day,
-            pickedTime.hour,
-            pickedTime.minute,
-          );
-          if (_returnDate.isBefore(_borrowDate)) {
-            _returnDate = _borrowDate.add(const Duration(hours: 2));
+    if (pickedTime != null) {
+      if (mounted) {
+        setState(() {
+          if (isBorrowDate) {
+            _borrowDate = DateTime(
+              _borrowDate.year,
+              _borrowDate.month,
+              _borrowDate.day,
+              pickedTime.hour,
+              pickedTime.minute,
+            );
+            if (_returnDate.isBefore(_borrowDate)) {
+              _returnDate = _borrowDate.add(const Duration(hours: 2));
+            }
+          } else {
+            _returnDate = DateTime(
+              _returnDate.year,
+              _returnDate.month,
+              _returnDate.day,
+              pickedTime.hour,
+              pickedTime.minute,
+            );
           }
-        } else {
-          _returnDate = DateTime(
-            _returnDate.year,
-            _returnDate.month,
-            _returnDate.day,
-            pickedTime.hour,
-            pickedTime.minute,
-          );
-        }
-      });
+        });
+      }
     }
   }
-}
+
+  // PASTE THE NEW FUNCTION HERE
+  Future<void> _confirmAndSubmitRequest() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final bool? confirm = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ready to Proceed?'),
+        content: const Text(
+          'This will send your request to the IT Admin. Please note that this does NOT reserve the item. Approval is first-come, first-served in person.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not Yet'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2B326B),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Confirm & Submit'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      // If the user confirmed, then call your original submit function
+      _submitBorrowRequest();
+    }
+  }
 
   Future<void> _submitBorrowRequest() async {
     if (!_formKey.currentState!.validate()) {
@@ -163,7 +203,8 @@ return Theme(
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-                'Please add your Student ID to your profile before requesting equipment.'),
+              'Please add your Student ID to your profile before requesting equipment.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -181,26 +222,30 @@ return Theme(
         throw 'User is not logged in.';
       }
 
-      await supabase.from('borrow_requests').insert({
-        'borrower_id': userId,
-        'equipment_id': widget.equipment.equipmentId,
-        'borrow_date': _borrowDate.toIso8601String(),
-        'return_date': _returnDate.toIso8601String(),
-        'status': 'pending',
-        'purpose': _purposeController.text.trim(),
-      });
+      // --- MODIFICATION: Use .select() to get the new request back ---
+      final response = await supabase
+          .from('borrow_requests')
+          .insert({
+            'borrower_id': userId,
+            'equipment_id': widget.equipment.equipmentId,
+            'borrow_date': _borrowDate.toIso8601String(),
+            'return_date': _returnDate.toIso8601String(),
+            'status': 'pending',
+            'purpose': _purposeController.text.trim(),
+          })
+          .select('*, equipment(name)')
+          .single(); // <-- Chained .select().single()
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Request submitted! Please see the IT Admin for approval.',
-            ),
-            backgroundColor: Colors.green,
+        // Create a BorrowRequest object from the response
+        final newRequest = BorrowRequest.fromMap(response);
+
+        // --- MODIFICATION: Navigate to the new screen instead of showing a SnackBar ---
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => RequestSubmittedPage(request: newRequest),
           ),
         );
-        Navigator.of(context).pop();
-        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
@@ -280,7 +325,9 @@ return Theme(
                   fillColor: Colors.grey[100],
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                   borderSide: BorderSide(color: const Color.fromARGB(255, 26, 40, 147)),
+                    borderSide: BorderSide(
+                      color: const Color.fromARGB(255, 26, 40, 147),
+                    ),
                   ),
                 ),
                 validator: (value) {
@@ -296,7 +343,7 @@ return Theme(
                 child: ElevatedButton(
                   onPressed: _isLoading || !_hasStudentId
                       ? null
-                      : _submitBorrowRequest,
+                      : _confirmAndSubmitRequest,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2B326B),
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -340,77 +387,93 @@ return Theme(
     );
   }
 
- Widget _buildClickableInfoRow(
+  Widget _buildClickableInfoRow(
     String label,
     String value,
     VoidCallback onDateTap,
     VoidCallback onTimeTap,
-) {
-  final dateFormat = DateFormat('MMM dd, yyyy');
-  final timeFormat = DateFormat('hh:mm a');
+  ) {
+    final dateFormat = DateFormat('MMM dd, yyyy');
+    final timeFormat = DateFormat('hh:mm a');
 
-  final borrowDateString = dateFormat.format(_borrowDate);
-  final borrowTimeString = timeFormat.format(_borrowDate);
+    final borrowDateString = dateFormat.format(_borrowDate);
+    final borrowTimeString = timeFormat.format(_borrowDate);
 
-  final returnDateString = dateFormat.format(_returnDate);
-  final returnTimeString = timeFormat.format(_returnDate);
+    final returnDateString = dateFormat.format(_returnDate);
+    final returnTimeString = timeFormat.format(_returnDate);
 
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Text(label, style: GoogleFonts.poppins(color: Colors.grey[600])),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            // Flexible para sa DATE
-            Flexible(
-              child: GestureDetector(
-                onTap: onDateTap,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        label == 'Borrow Date' ? borrowDateString : returnDateString,
-                        textAlign: TextAlign.end,
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                        overflow: TextOverflow.ellipsis,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: GoogleFonts.poppins(color: Colors.grey[600])),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              // Flexible para sa DATE
+              Flexible(
+                child: GestureDetector(
+                  onTap: onDateTap,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          label == 'Borrow Date'
+                              ? borrowDateString
+                              : returnDateString,
+                          textAlign: TextAlign.end,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                  ],
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            // Flexible para sa TIME
-            Flexible(
-              child: GestureDetector(
-                onTap: onTimeTap,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        label == 'Borrow Date' ? borrowTimeString : returnTimeString,
-                        textAlign: TextAlign.end,
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                        overflow: TextOverflow.ellipsis,
+              const SizedBox(width: 12),
+              // Flexible para sa TIME
+              Flexible(
+                child: GestureDetector(
+                  onTap: onTimeTap,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          label == 'Borrow Date'
+                              ? borrowTimeString
+                              : returnTimeString,
+                          textAlign: TextAlign.end,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                  ],
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.access_time,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 }

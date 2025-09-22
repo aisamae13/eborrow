@@ -11,6 +11,7 @@ class BorrowRequest {
   final String? purpose;
   final String status;
   final DateTime createdAt;
+  final int modificationCount;
 
   BorrowRequest({
     required this.requestId,
@@ -22,6 +23,7 @@ class BorrowRequest {
     this.purpose,
     required this.status,
     required this.createdAt,
+    required this.modificationCount,
   });
 
   Color getStatusColor() {
@@ -35,6 +37,8 @@ class BorrowRequest {
       case 'returned':
         return Colors.green;
       case 'rejected':
+        return Colors.grey;
+      case 'expired': // <-- ADD THIS CASE
         return Colors.grey;
       default:
         return Colors.black;
@@ -52,6 +56,7 @@ class BorrowRequest {
       purpose: map['purpose'],
       status: map['status'],
       createdAt: DateTime.parse(map['created_at']),
+      modificationCount: map['modification_count'] ?? 0,
     );
   }
 }
