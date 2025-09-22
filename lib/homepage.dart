@@ -84,7 +84,7 @@ class _HomePageState extends State<HomePage> {
           'Borrower',
           style: GoogleFonts.poppins(
             fontSize: 24,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w500,
             color: Colors.white,
           ),
         ),
