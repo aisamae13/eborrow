@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'main.dart';
-import 'models/borrow_request.dart'; // MODIFIED: Import BorrowRequest model
+import 'models/borrow_request.dart';
 
-// MODIFIED: Class name and constructor
 class ModifyRequestPage extends StatefulWidget {
   final BorrowRequest request;
   const ModifyRequestPage({super.key, required this.request});
@@ -13,7 +12,6 @@ class ModifyRequestPage extends StatefulWidget {
   State<ModifyRequestPage> createState() => _ModifyRequestPageState();
 }
 
-// MODIFIED: State class name
 class _ModifyRequestPageState extends State<ModifyRequestPage> {
   final _purposeController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -22,14 +20,14 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
   late DateTime _borrowDate;
   late DateTime _returnDate;
 
-  @override
-  void initState() {
-    super.initState();
-    // MODIFIED: Pre-fill form with data from the request object
-    _borrowDate = widget.request.borrowDate;
-    _returnDate = widget.request.returnDate;
-    _purposeController.text = widget.request.purpose ?? '';
-  }
+
+@override
+void initState() {
+  super.initState();
+  _borrowDate = DateTime.now();
+  _returnDate = widget.request.returnDate;
+  _purposeController.text = widget.request.purpose ?? '';
+}
 
   @override
   void dispose() {
@@ -37,30 +35,27 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
     super.dispose();
   }
 
-  // This function can be reused for picking the return date
   Future<void> _selectDate(BuildContext context) async {
-    final DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: _returnDate,
-      firstDate: _borrowDate, // Can't set return date before borrow date
-      lastDate: DateTime.now().add(const Duration(days: 30)),
-    );
+  final DateTime? pickedDate = await showDatePicker(
+    context: context,
+    initialDate: _returnDate,
+    firstDate: DateTime.now(), // FIXED: Use current time, not original borrow date
+    lastDate: DateTime.now().add(const Duration(days: 30)),
+  );
 
-    if (pickedDate != null && mounted) {
-      setState(() {
-        // Combine the picked date with the existing time of the return date
-        _returnDate = DateTime(
-          pickedDate.year,
-          pickedDate.month,
-          pickedDate.day,
-          _returnDate.hour,
-          _returnDate.minute,
-        );
-      });
-    }
+  if (pickedDate != null && mounted) {
+    setState(() {
+      _returnDate = DateTime(
+        pickedDate.year,
+        pickedDate.month,
+        pickedDate.day,
+        _returnDate.hour,
+        _returnDate.minute,
+      );
+    });
   }
+}
 
-  // This function can be reused for picking the return time
   Future<void> _selectTime(BuildContext context) async {
     final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
@@ -80,25 +75,26 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
     }
   }
 
-  // ---- NEW: Function to handle the UPDATE operation ----
+ bool _isReturnDateValid() {
+  return _returnDate.isAfter(_borrowDate);
+}
+
   Future<void> _submitModifiedRequest() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    // Prevent setting a return time that is before the borrow time
-    if (_returnDate.isBefore(_borrowDate)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Return date cannot be earlier than the borrow date.',
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return;
-    }
+
+   if (!_isReturnDateValid()) {
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Return date and time must be in the future.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+  return;
+}
 
     setState(() {
       _isLoading = true;
@@ -108,7 +104,7 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
       await supabase
           .from('borrow_requests')
           .update({
-            'return_date': _returnDate.toIso8601String(), // <-- Corrected
+            'return_date': _returnDate.toIso8601String(),
             'purpose': _purposeController.text.trim(),
             'modification_count': widget.request.modificationCount + 1,
           })
@@ -121,7 +117,6 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
             backgroundColor: Colors.green,
           ),
         );
-        // Pop back to the history page
         Navigator.of(context).pop();
       }
     } catch (e) {
@@ -146,131 +141,243 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM dd, yyyy');
     final timeFormat = DateFormat('hh:mm a');
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 600;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Modify Request', // MODIFIED: Title
+          'Modify Request',
           style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xFF2B326B),
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.request.equipmentName, // MODIFIED: Get name from request
-                style: GoogleFonts.poppins(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 24),
-              // MODIFIED: Only show Return Date for editing
-              _buildInfoRow(
-                'Return Date',
-                '${dateFormat.format(_returnDate)} at ${timeFormat.format(_returnDate)}',
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton.icon(
-                    onPressed: () => _selectDate(context),
-                    icon: const Icon(Icons.calendar_today, size: 16),
-                    label: const Text('Change Date'),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: () => _selectTime(context),
-                    icon: const Icon(Icons.access_time, size: 16),
-                    label: const Text('Change Time'),
-                  ),
-                ],
-              ),
-              const Divider(height: 20),
-              Text(
-                'Purpose',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _purposeController,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: 'e.g., For class presentation in Room 501',
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter the purpose for borrowing.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : _submitModifiedRequest, // MODIFIED: Call new function
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2B326B),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.0),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 800, // Maximum width for larger screens
+              minHeight: size.height -
+                  MediaQuery.of(context).padding.top -
+                  kToolbarHeight - 120,
+            ),
+            child: Center(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Equipment Name - Responsive text
+                    Container(
+                      width: double.infinity,
+                      child: Text(
+                        widget.request.equipmentName,
+                        style: GoogleFonts.poppins(
+                          fontSize: isSmallScreen ? 20 : 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      ),
                     ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white),
-                        )
-                      : Text(
-                          'Save Changes', // MODIFIED: Button text
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                    SizedBox(height: isSmallScreen ? 16 : 24),
+
+                    // Return Date Section
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[200]!),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildInfoRow(
+                            'Return Date',
+                            '${dateFormat.format(_returnDate)} at ${timeFormat.format(_returnDate)}',
+                            isSmallScreen,
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Responsive button layout
+                          if (isSmallScreen)
+                            // Stack buttons vertically on small screens
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: () => _selectDate(context),
+                                  icon: const Icon(Icons.calendar_today, size: 16),
+                                  label: const Text('Change Date'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: const Color(0xFF2B326B),
+                                    side: const BorderSide(color: Color(0xFF2B326B)),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                ElevatedButton.icon(
+                                  onPressed: () => _selectTime(context),
+                                  icon: const Icon(Icons.access_time, size: 16),
+                                  label: const Text('Change Time'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: const Color(0xFF2B326B),
+                                    side: const BorderSide(color: Color(0xFF2B326B)),
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            // Side by side on larger screens
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                TextButton.icon(
+                                  onPressed: () => _selectDate(context),
+                                  icon: const Icon(Icons.calendar_today, size: 16),
+                                  label: const Text('Change Date'),
+                                ),
+                                const SizedBox(width: 8),
+                                TextButton.icon(
+                                  onPressed: () => _selectTime(context),
+                                  icon: const Icon(Icons.access_time, size: 16),
+                                  label: const Text('Change Time'),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: isSmallScreen ? 16 : 20),
+
+                    // Purpose Section
+                    Text(
+                      'Purpose',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _purposeController,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: 'e.g., For class presentation in Room 501',
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2B326B)),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter the purpose for borrowing.';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    SizedBox(height: isSmallScreen ? 24 : 32),
+
+                    // Save Button - Full width and responsive
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _submitModifiedRequest,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2B326B),
+                          padding: EdgeInsets.symmetric(
+                            vertical: isSmallScreen ? 14 : 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0),
                           ),
                         ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                'Save Changes',
+                                style: GoogleFonts.poppins(
+                                  fontSize: isSmallScreen ? 14 : 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // Simplified row widget since it's no longer clickable
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: GoogleFonts.poppins(color: Colors.grey[600])),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+  // IMPROVED: Responsive info row that handles overflow better
+  Widget _buildInfoRow(String label, String value, bool isSmallScreen) {
+    if (isSmallScreen) {
+      // Stack vertically on small screens
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              color: Colors.grey[600],
+              fontSize: 14,
+            ),
           ),
-        ),
-      ],
-    );
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      );
+    } else {
+      // Side by side on larger screens
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.poppins(color: Colors.grey[600]),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      );
+    }
   }
 }
