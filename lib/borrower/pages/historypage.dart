@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'main.dart';
-import 'models/borrow_request.dart';
-import 'package:eborrow/utils/string_extension.dart';
+import '../../main.dart';
+import '../models/borrow_request.dart';
+import 'package:eborrow/shared/utils/string_extension.dart';
 import 'modify_request_page.dart';
-import 'notifications/notification_service.dart';
+import '../../shared/notifications/notification_service.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -14,7 +14,8 @@ class HistoryPage extends StatefulWidget {
   State<HistoryPage> createState() => _HistoryPageState();
 }
 
-class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin {
+class _HistoryPageState extends State<HistoryPage>
+    with TickerProviderStateMixin {
   int _selectedIndex = 0;
   Future<List<BorrowRequest>>? _requestsFuture;
 
@@ -128,7 +129,8 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
         await NotificationService.createNotification(
           userId: request.borrowerId,
           title: 'Request Cancelled',
-          message: 'You have cancelled your borrow request for "${request.equipmentName}".',
+          message:
+              'You have cancelled your borrow request for "${request.equipmentName}".',
           type: NotificationType.general,
           metadata: {
             'equipment_name': request.equipmentName,
@@ -195,21 +197,25 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
 
                 // Clear status categorization
                 final activeItems = allRequests
-                    .where((r) => [
-                      'pending',    // Waiting for approval
-                      'approved',   // Approved, ready for pickup
-                      'active',     // Currently borrowed
-                      'overdue',    // Past due date
-                    ].contains(r.status.toLowerCase()))
+                    .where(
+                      (r) => [
+                        'pending', // Waiting for approval
+                        'approved', // Approved, ready for pickup
+                        'active', // Currently borrowed
+                        'overdue', // Past due date
+                      ].contains(r.status.toLowerCase()),
+                    )
                     .toList();
 
                 final historyItems = allRequests
-                    .where((r) => [
-                      'returned',   // Successfully returned
-                      'rejected',   // Denied by admin
-                      'cancelled',  // Cancelled by user
-                      'expired',    // Request expired (optional)
-                    ].contains(r.status.toLowerCase()))
+                    .where(
+                      (r) => [
+                        'returned', // Successfully returned
+                        'rejected', // Denied by admin
+                        'cancelled', // Cancelled by user
+                        'expired', // Request expired (optional)
+                      ].contains(r.status.toLowerCase()),
+                    )
                     .toList();
 
                 return PageView(
@@ -480,7 +486,8 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => ModifyRequestPage(request: item),
+                              builder: (context) =>
+                                  ModifyRequestPage(request: item),
                             ),
                           ).then((_) {
                             _refreshData();
@@ -488,7 +495,9 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
                         },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.blue.shade700,
-                    side: BorderSide(color: const Color.fromARGB(255, 168, 168, 168)),
+                    side: BorderSide(
+                      color: const Color.fromARGB(255, 168, 168, 168),
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -562,7 +571,11 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
     }
   }
 
-  Widget _buildDateInfo(BorrowRequest item, DateFormat formatter, Color statusColor) {
+  Widget _buildDateInfo(
+    BorrowRequest item,
+    DateFormat formatter,
+    Color statusColor,
+  ) {
     switch (item.status.toLowerCase()) {
       case 'pending':
       case 'approved':

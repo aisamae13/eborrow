@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'models/borrow_request.dart';
+import '../models/borrow_request.dart';
 
 class RequestSubmittedPage extends StatefulWidget {
   final BorrowRequest request;

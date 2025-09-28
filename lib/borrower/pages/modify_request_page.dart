@@ -1,9 +1,9 @@
-import 'package:eborrow/notifications/notification_service.dart';
+import 'package:eborrow/shared/notifications/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'main.dart';
-import 'models/borrow_request.dart';
+import '../../main.dart';
+import '../models/borrow_request.dart';
 
 class ModifyRequestPage extends StatefulWidget {
   final BorrowRequest request;
@@ -74,7 +74,8 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
               // Change the text color of the AM/PM text
               dayPeriodTextColor: MaterialStateColor.resolveWith(
                 (states) => states.contains(MaterialState.selected)
-                    ? Colors.white // Selected AM/PM text color
+                    ? Colors
+                          .white // Selected AM/PM text color
                     : Colors.black, // Unselected AM/PM text color
               ),
               // You can also change the border color
@@ -105,7 +106,7 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
     return _returnDate.isAfter(_borrowDate);
   }
 
- Future<void> _submitModifiedRequest() async {
+  Future<void> _submitModifiedRequest() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -136,7 +137,8 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
           })
           .eq('request_id', widget.request.requestId);
 
-      if (widget.request.modificationCount >= 2) { // Will be 3 after this update
+      if (widget.request.modificationCount >= 2) {
+        // Will be 3 after this update
         await NotificationService.createModificationLimitNotification(
           userId: supabase.auth.currentUser!.id,
           equipmentName: widget.request.equipmentName,
@@ -170,7 +172,6 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM dd, yyyy');
@@ -193,9 +194,11 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: 800, // Maximum width for larger screens
-              minHeight: size.height -
+              minHeight:
+                  size.height -
                   MediaQuery.of(context).padding.top -
-                  kToolbarHeight - 120,
+                  kToolbarHeight -
+                  120,
             ),
             child: Center(
               child: Form(
@@ -246,12 +249,17 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
                               children: [
                                 ElevatedButton.icon(
                                   onPressed: () => _selectDate(context),
-                                  icon: const Icon(Icons.calendar_today, size: 16),
+                                  icon: const Icon(
+                                    Icons.calendar_today,
+                                    size: 16,
+                                  ),
                                   label: const Text('Change Date'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                     foregroundColor: const Color(0xFF2B326B),
-                                    side: const BorderSide(color: Color(0xFF2B326B)),
+                                    side: const BorderSide(
+                                      color: Color(0xFF2B326B),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -262,7 +270,9 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                     foregroundColor: const Color(0xFF2B326B),
-                                    side: const BorderSide(color: Color(0xFF2B326B)),
+                                    side: const BorderSide(
+                                      color: Color(0xFF2B326B),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -274,7 +284,10 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
                               children: [
                                 TextButton.icon(
                                   onPressed: () => _selectDate(context),
-                                  icon: const Icon(Icons.calendar_today, size: 16),
+                                  icon: const Icon(
+                                    Icons.calendar_today,
+                                    size: 16,
+                                  ),
                                   label: const Text('Change Date'),
                                 ),
                                 const SizedBox(width: 8),
@@ -313,7 +326,9 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF2B326B)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF2B326B),
+                          ),
                         ),
                       ),
                       validator: (value) {
@@ -378,10 +393,7 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
         children: [
           Text(
             label,
-            style: GoogleFonts.poppins(
-              color: Colors.grey[600],
-              fontSize: 14,
-            ),
+            style: GoogleFonts.poppins(color: Colors.grey[600], fontSize: 14),
           ),
           const SizedBox(height: 4),
           Text(
@@ -398,10 +410,7 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
       return Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: GoogleFonts.poppins(color: Colors.grey[600]),
-          ),
+          Text(label, style: GoogleFonts.poppins(color: Colors.grey[600])),
           Flexible(
             child: Text(
               value,

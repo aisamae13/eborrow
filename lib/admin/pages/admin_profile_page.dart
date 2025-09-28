@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'main.dart';
-import 'landingpage.dart';
-import 'change_password_page.dart';
+import '../../main.dart';
+import '../../shared/auth/landingpage.dart';
+import '../services/admin_auth_service.dart';
 
-class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+class AdminProfilePage extends StatefulWidget {
+  const AdminProfilePage({super.key});
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  State<AdminProfilePage> createState() => _AdminProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _AdminProfilePageState extends State<AdminProfilePage> {
   Map<String, dynamic>? _profileData;
   bool _isLoading = true;
 
@@ -22,28 +21,15 @@ class _ProfilePageState extends State<ProfilePage> {
     _fetchProfile();
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
   Future<void> _fetchProfile() async {
     setState(() {
       _isLoading = true;
     });
-    try {
-      final userId = supabase.auth.currentUser?.id;
-      if (userId == null) {
-        throw 'User not found.';
-      }
-      final response = await supabase
-          .from('user_profiles')
-          .select()
-          .eq('id', userId)
-          .single();
 
+    try {
+      final profile = await AdminAuthService.getAdminProfile();
       setState(() {
-        _profileData = response;
+        _profileData = profile;
         _isLoading = false;
       });
     } catch (e) {
@@ -61,7 +47,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // ADDED: Your new sign-out confirmation dialog function
   Future<void> _showSignOutConfirmationDialog() async {
     final bool? shouldSignOut = await showDialog<bool>(
       context: context,
@@ -100,7 +85,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Signing out will end your session.\nAre you sure you want to sign out?',
+                  'Signing out will end your admin session.\nAre you sure you want to sign out?',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
@@ -167,11 +152,11 @@ class _ProfilePageState extends State<ProfilePage> {
           MaterialPageRoute(builder: (context) => const LandingPage()),
           (route) => false,
         );
-      } on AuthException catch (e) {
+      } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(e.message),
+              content: Text('Error signing out: ${e.toString()}'),
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
           );
@@ -180,97 +165,20 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // NOTE: The previous `_signOut` function has been removed because it is now
-  // integrated into the new `_showSignOutConfirmationDialog` function.
-
-  void _showEditStudentIdDialog() {
-    final studentIdController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Enter Student ID'),
-          content: TextField(
-            controller: studentIdController,
-            decoration: const InputDecoration(hintText: "Your Student ID"),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                _updateStudentId(studentIdController.text.trim());
-                Navigator.of(context).pop();
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _updateStudentId(String newId) async {
-    if (newId.isEmpty) {
-      return;
-    }
-    try {
-      final userId = supabase.auth.currentUser?.id;
-      if (userId == null) {
-        throw 'User not found.';
-      }
-      await supabase
-          .from('user_profiles')
-          .update({'student_id': newId})
-          .eq('id', userId);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Student ID updated successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _fetchProfile();
-      }
-    } on PostgrestException catch (e) {
-      if (mounted) {
-        String errorMessage = 'Error updating Student ID.';
-        if (e.code == '23505') {
-          errorMessage =
-              'This Student ID is already taken. Please use a different one.';
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('An unexpected error occurred.'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Text(
-          'My Profile',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+          'Admin Profile',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         backgroundColor: const Color(0xFF2B326B),
-        foregroundColor: Colors.white,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -280,21 +188,15 @@ class _ProfilePageState extends State<ProfilePage> {
                 _buildProfileInfoCard(),
                 const SizedBox(height: 24),
                 _buildOptionTile(
-                  icon: Icons.lock_outline,
-                  title: 'Change Password',
+                  icon: Icons.settings,
+                  title: 'Admin Settings',
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ChangePasswordPage(),
-                      ),
-                    );
+                    // Navigate to admin settings
                   },
                 ),
                 _buildOptionTile(
                   icon: Icons.logout,
                   title: 'Sign Out',
-                  // REPLACED: Calls the new dialog function instead of the old sign-out function
                   onTap: _showSignOutConfirmationDialog,
                   isDestructive: true,
                 ),
@@ -304,9 +206,6 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildProfileInfoCard() {
-    final studentId = _profileData?['student_id'];
-    final hasStudentId = studentId != null && studentId.isNotEmpty;
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -321,13 +220,16 @@ class _ProfilePageState extends State<ProfilePage> {
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment
-            .stretch,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const CircleAvatar(
             radius: 40,
             backgroundColor: Color(0xFF2B326B),
-            child: Icon(Icons.person, size: 40, color: Colors.white),
+            child: Icon(
+              Icons.admin_panel_settings,
+              size: 40,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 16),
           Text(
@@ -338,46 +240,19 @@ class _ProfilePageState extends State<ProfilePage> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 16),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Student ID:',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Row(
-                children: [
-                  Text(
-                    hasStudentId ? studentId! : 'Not Set',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: hasStudentId ? Colors.black87 : Colors.red,
-                    ),
-                  ),
-                  if (!hasStudentId)
-                    IconButton(
-                      icon: const Icon(
-                        Icons.edit,
-                        size: 20,
-                        color: Colors.blue,
-                      ),
-                      onPressed: _showEditStudentIdDialog,
-                      constraints: const BoxConstraints(),
-                      padding: const EdgeInsets.only(left: 8),
-                    ),
-                ],
-              ),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            'Administrator',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              color: const Color(0xFF2B326B),
+              fontWeight: FontWeight.w500,
+            ),
           ),
-
-          const SizedBox(height: 4),
+          const SizedBox(height: 16),
           _buildInfoRow('Email:', _profileData?['email'] ?? 'N/A'),
+          _buildInfoRow('Role:', _profileData?['role'] ?? 'N/A'),
         ],
       ),
     );
@@ -385,9 +260,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 8.0,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -420,15 +293,30 @@ class _ProfilePageState extends State<ProfilePage> {
     bool isDestructive = false,
   }) {
     final color = isDestructive ? Colors.red : Colors.black87;
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(
-        title,
-        style: GoogleFonts.poppins(color: color, fontWeight: FontWeight.w500),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
-      trailing: Icon(Icons.arrow_forward_ios, size: 16, color: color),
-      onTap: onTap,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        leading: Icon(icon, color: color),
+        title: Text(
+          title,
+          style: GoogleFonts.poppins(color: color, fontWeight: FontWeight.w500),
+        ),
+        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: color),
+        onTap: onTap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     );
   }
 }

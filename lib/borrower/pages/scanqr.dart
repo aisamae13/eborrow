@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'main.dart';
-import 'models/equipment_model.dart'; // This is the correct import
+import '../../main.dart';
+import '../models/equipment_model.dart'; // This is the correct import
 import 'equipment_detail_page.dart';
 
 class ScanQRPage extends StatefulWidget {
@@ -81,7 +81,7 @@ class _ScanQRPageState extends State<ScanQRPage> with WidgetsBindingObserver {
         title: const Text(
           'QR Scanner',
           style: TextStyle(
-            fontSize: 24,
+            fontSize: 22,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
@@ -144,10 +144,7 @@ class _ScanQRPageState extends State<ScanQRPage> with WidgetsBindingObserver {
                   padding: EdgeInsets.symmetric(horizontal: 20.0),
                   child: Text(
                     'Position the QR code within the frame',
-                    style: TextStyle(
-                      color: Color(0xFF888888),
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: Color(0xFF888888), fontSize: 16),
                   ),
                 ),
               ),
@@ -182,7 +179,8 @@ class _ScanQRPageState extends State<ScanQRPage> with WidgetsBindingObserver {
         // Equipment found! Navigate to the detail page.
         final equipment = Equipment.fromMap(response);
         if (mounted) {
-          Navigator.of(context).pushReplacement(
+          Navigator.of(context).push(
+            // <-- MODIFIED
             MaterialPageRoute(
               builder: (context) => EquipmentDetailPage(equipment: equipment),
             ),

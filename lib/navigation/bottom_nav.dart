@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'homepage.dart';
-import 'catalogpage.dart';
-import 'scanqr.dart';
-import 'historypage.dart';
-
+import '../borrower/pages/homepage.dart';
+import '../borrower/pages/catalogpage.dart';
+import '../borrower/pages/scanqr.dart';
+import '../borrower/pages/historypage.dart';
 
 class BottomNav extends StatefulWidget {
   const BottomNav({super.key});
@@ -50,10 +49,7 @@ class _BottomNavState extends State<BottomNav> {
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
             icon: Icon(Icons.inventory_2_outlined),
             label: 'Catalog',
@@ -62,10 +58,7 @@ class _BottomNavState extends State<BottomNav> {
             icon: Icon(Icons.qr_code_scanner),
             label: 'Scan QR',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'History',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
         ],
         currentIndex: _selectedIndex, // Set the current index
         selectedItemColor: const Color(0xFF4A55A2),

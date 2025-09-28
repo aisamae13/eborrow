@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'main.dart';
+import '../../main.dart';
 
 class CreateNewPasswordPage extends StatefulWidget {
   const CreateNewPasswordPage({super.key});
@@ -27,15 +27,20 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
 
   // Check individual password criteria
   bool _hasMinLength(String password) => password.length >= 8;
-  bool _hasLowercase(String password) => RegExp(r'(?=.*[a-z])').hasMatch(password);
-  bool _hasUppercase(String password) => RegExp(r'(?=.*[A-Z])').hasMatch(password);
+  bool _hasLowercase(String password) =>
+      RegExp(r'(?=.*[a-z])').hasMatch(password);
+  bool _hasUppercase(String password) =>
+      RegExp(r'(?=.*[A-Z])').hasMatch(password);
   bool _hasNumber(String password) => RegExp(r'(?=.*\d)').hasMatch(password);
 
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return 'Password is required';
     }
-    if (!_hasMinLength(value) || !_hasLowercase(value) || !_hasUppercase(value) || !_hasNumber(value)) {
+    if (!_hasMinLength(value) ||
+        !_hasLowercase(value) ||
+        !_hasUppercase(value) ||
+        !_hasNumber(value)) {
       return 'Please meet all password requirements below';
     }
     return null;
@@ -189,7 +194,8 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
                     controller: _passwordController,
                     obscureText: !_isPasswordVisible,
                     validator: _validatePassword,
-                    onChanged: (value) => setState(() {}), // Trigger rebuild to update criteria
+                    onChanged: (value) =>
+                        setState(() {}), // Trigger rebuild to update criteria
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: Colors.grey[200],

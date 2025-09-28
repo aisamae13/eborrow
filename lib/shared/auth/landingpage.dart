@@ -43,7 +43,9 @@ class LandingPage extends StatelessWidget {
                       // EBORROW logo
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          double logoWidth = constraints.maxWidth > 300 ? 300 : constraints.maxWidth - 20;
+                          double logoWidth = constraints.maxWidth > 300
+                              ? 300
+                              : constraints.maxWidth - 20;
                           return Container(
                             width: logoWidth,
                             height: 130,
@@ -75,33 +77,35 @@ class LandingPage extends StatelessWidget {
 
                   // Get Started Button
                   SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const LoginPage()),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.0),
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LoginPage(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                      ),
+                      child: Text(
+                        'GET STARTED',
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.0,
+                          color: const Color(0xFF2E4F7A),
+                        ),
                       ),
                     ),
-                    child: Text(
-                  'GET STARTED',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.0,
-                    color: const Color(0xFF2E4F7A),
                   ),
-                ),
-                  ),
-                ),
 
                   const SizedBox(height: 200),
                 ],

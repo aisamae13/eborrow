@@ -1,4 +1,4 @@
-import 'package:eborrow/notifications/notification_service.dart';
+import 'package:eborrow/shared/notifications/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -72,7 +72,11 @@ class _NotificationPageState extends State<NotificationPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.notifications_none, size: 80, color: Colors.grey[400]),
+                  Icon(
+                    Icons.notifications_none,
+                    size: 80,
+                    color: Colors.grey[400],
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'No notifications yet',
@@ -85,9 +89,7 @@ class _NotificationPageState extends State<NotificationPage> {
                   const SizedBox(height: 8),
                   Text(
                     'You\'ll see important updates here',
-                    style: GoogleFonts.poppins(
-                      color: Colors.grey[500],
-                    ),
+                    style: GoogleFonts.poppins(color: Colors.grey[500]),
                   ),
                 ],
               ),
@@ -117,7 +119,9 @@ class _NotificationPageState extends State<NotificationPage> {
           color: notification.isRead ? Colors.white : Colors.blue.shade50,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: notification.isRead ? Colors.grey.shade200 : Colors.blue.shade200,
+            color: notification.isRead
+                ? Colors.grey.shade200
+                : Colors.blue.shade200,
           ),
           boxShadow: [
             BoxShadow(

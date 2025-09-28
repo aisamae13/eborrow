@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart'; // Add this import
-import 'main.dart';
-import 'profile_page.dart';
-import 'notifications/notification_page.dart';
-import 'notifications/notification_with_badge.dart';
-import 'notifications/notification_service.dart'; // Add this import
+import '../../main.dart';
+import '../../shared/profile/profile_page.dart';
+import '../../shared/notifications/notification_page.dart';
+import '../../shared/notifications/notification_with_badge.dart';
+import '../../shared/notifications/notification_service.dart'; // Add this import
 
 class HomePage extends StatefulWidget {
   final Function(int) onNavigate;
@@ -95,7 +95,9 @@ class _HomePageState extends State<HomePage> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const NotificationPage()),
+                MaterialPageRoute(
+                  builder: (context) => const NotificationPage(),
+                ),
               );
             },
           ),
@@ -142,9 +144,13 @@ class _HomePageState extends State<HomePage> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   } else if (snapshot.hasError) {
-                    return const Center(child: Text('Error loading categories.'));
+                    return const Center(
+                      child: Text('Error loading categories.'),
+                    );
                   } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('No categories available.'));
+                    return const Center(
+                      child: Text('No categories available.'),
+                    );
                   } else {
                     return _buildCategoryGrid(snapshot.data!);
                   }
@@ -165,9 +171,7 @@ class _HomePageState extends State<HomePage> {
                   } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                     return const Column(
                       children: [
-                        Center(
-                          child: Text('No recent activity to show.'),
-                        ),
+                        Center(child: Text('No recent activity to show.')),
                         SizedBox(height: 24),
                       ],
                     );
@@ -175,10 +179,12 @@ class _HomePageState extends State<HomePage> {
                     return Column(
                       children: [
                         ...snapshot.data!
-                            .map((item) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 12.0),
-                                  child: _buildRecentActivityItem(item),
-                                ))
+                            .map(
+                              (item) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12.0),
+                                child: _buildRecentActivityItem(item),
+                              ),
+                            )
                             .toList(),
                         const SizedBox(height: 24),
                       ],
@@ -225,7 +231,10 @@ class _HomePageState extends State<HomePage> {
               context,
               MaterialPageRoute(builder: (context) => const ProfilePage()),
             ),
-            child: const Text('Add ID', style: TextStyle(color: Color(0xFF2B326B))),
+            child: const Text(
+              'Add ID',
+              style: TextStyle(color: Color(0xFF2B326B)),
+            ),
           ),
         ],
       ),
@@ -350,16 +359,18 @@ class _HomePageState extends State<HomePage> {
       spacing: 16,
       runSpacing: 16,
       children: categories
-          .map((category) => SizedBox(
-                width: (MediaQuery.of(context).size.width - 48) / 2,
-                child: _buildCategoryCard(
-                  icon: _getIconForCategory(category.name),
-                  label: category.name,
-                  count: '${category.availableCount} available',
-                  color: _getColorForCategory(category.name).shade100,
-                  iconColor: _getColorForCategory(category.name).shade800,
-                ),
-              ))
+          .map(
+            (category) => SizedBox(
+              width: (MediaQuery.of(context).size.width - 48) / 2,
+              child: _buildCategoryCard(
+                icon: _getIconForCategory(category.name),
+                label: category.name,
+                count: '${category.availableCount} available',
+                color: _getColorForCategory(category.name).shade100,
+                iconColor: _getColorForCategory(category.name).shade800,
+              ),
+            ),
+          )
           .toList(),
     );
   }
@@ -496,7 +507,9 @@ class _HomePageState extends State<HomePage> {
 
   Future<List<EquipmentCategory>> _fetchCategories() async {
     try {
-      final categoriesResponse = await supabase.from('equipment_categories').select();
+      final categoriesResponse = await supabase
+          .from('equipment_categories')
+          .select();
       final categories = categoriesResponse.map((map) {
         return EquipmentCategory(
           id: map['category_id'],

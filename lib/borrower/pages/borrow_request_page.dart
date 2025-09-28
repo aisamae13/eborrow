@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'main.dart';
-import 'models/equipment_model.dart';
+import '../../main.dart';
+import '../models/equipment_model.dart';
 import 'request_submitted_page.dart';
-import 'models/borrow_request.dart';
+import '../models/borrow_request.dart';
 
 class BorrowRequestPage extends StatefulWidget {
   final Equipment equipment;

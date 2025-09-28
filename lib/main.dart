@@ -5,11 +5,14 @@ import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart'; // Add this import
-import 'landingpage.dart';
-import 'loginpage.dart';
-import 'bottom_nav.dart';
-import 'createnewpasswordpage.dart';
-import 'notifications/notification_service.dart'; // Add this import
+import 'shared/auth/landingpage.dart';
+import 'shared/auth/loginpage.dart';
+import 'navigation/bottom_nav.dart';
+import 'shared/auth/createnewpasswordpage.dart';
+import 'shared/notifications/notification_service.dart'; // Add this import
+
+import 'admin/services/admin_auth_service.dart';
+import 'admin/widgets/admin_bottom_nav.dart';
 
 // Global navigator key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -67,7 +70,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
       // Additional debugging for OAuth flow
       if (data.event == AuthChangeEvent.signedIn) {
-        debugPrint('User successfully signed in via ${data.session?.user.appMetadata['provider'] ?? 'email'}');
+        debugPrint(
+          'User successfully signed in via ${data.session?.user.appMetadata['provider'] ?? 'email'}',
+        );
 
         // Initialize notifications when user signs in
         final userId = data.session?.user.id;
@@ -134,13 +139,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         // This helps catch OAuth callbacks that completed while app was in background
         final currentSession = supabase.auth.currentSession;
         if (currentSession != null) {
-          debugPrint('Found existing session after app resume: ${currentSession.user.email}');
+          debugPrint(
+            'Found existing session after app resume: ${currentSession.user.email}',
+          );
 
           // Re-initialize notifications if needed (helpful for mobile apps that were backgrounded)
           WidgetsBinding.instance.addPostFrameCallback((_) {
             final context = navigatorKey.currentContext;
             if (context != null && context.mounted) {
-              context.read<NotificationProvider>().initializeRealtime(currentSession.user.id);
+              context.read<NotificationProvider>().initializeRealtime(
+                currentSession.user.id,
+              );
             }
           });
         }
@@ -153,14 +162,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       final uri = Uri.base;
       debugPrint('Checking URI for OAuth tokens: ${uri.toString()}');
 
-      if (uri.fragment.contains('access_token') || uri.queryParameters.containsKey('access_token')) {
+      if (uri.fragment.contains('access_token') ||
+          uri.queryParameters.containsKey('access_token')) {
         debugPrint('Found OAuth tokens in URL, processing...');
         await supabase.auth.getSessionFromUrl(uri);
       }
 
       // Check for password recovery tokens in URL
-      if (uri.fragment.contains('type=recovery') || uri.queryParameters.containsKey('type')) {
-        final type = uri.queryParameters['type'] ?? uri.fragment.split('type=')[1].split('&')[0];
+      if (uri.fragment.contains('type=recovery') ||
+          uri.queryParameters.containsKey('type')) {
+        final type =
+            uri.queryParameters['type'] ??
+            uri.fragment.split('type=')[1].split('&')[0];
         if (type == 'recovery') {
           debugPrint('Found password recovery token in URL, processing...');
           await supabase.auth.getSessionFromUrl(uri);
@@ -193,9 +206,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
+              body: Center(child: CircularProgressIndicator()),
             );
           }
 
@@ -208,11 +219,24 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           }
 
           if (session != null) {
-            debugPrint('Navigating to BottomNav for user: ${session.user.email}');
-            debugPrint('Auth provider: ${session.user.appMetadata['provider']}');
-            return const BottomNav();
+            // Check if user is admin
+            return FutureBuilder<bool>(
+              future: AdminAuthService.isAdmin(),
+              builder: (context, adminSnapshot) {
+                if (adminSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                if (adminSnapshot.data == true) {
+                  return const AdminBottomNav(); // Admin interface
+                } else {
+                  return const BottomNav(); // Borrower interface
+                }
+              },
+            );
           } else {
-            debugPrint('Navigating to LandingPage - no session');
             return const LandingPage();
           }
         },

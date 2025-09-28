@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'main.dart';
+import '../../main.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -114,7 +114,9 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_acceptPrivacyPolicy || !_acceptTermsConditions) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please accept both the Privacy Policy and Terms & Conditions to continue.'),
+          content: Text(
+            'Please accept both the Privacy Policy and Terms & Conditions to continue.',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -546,13 +548,15 @@ class _RegisterPageState extends State<RegisterPage> {
                                   });
                                 },
                                 activeColor: const Color(0xFF2E4F7A),
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
                               ),
                               Expanded(
                                 child: GestureDetector(
                                   onTap: () {
                                     setState(() {
-                                      _acceptPrivacyPolicy = !_acceptPrivacyPolicy;
+                                      _acceptPrivacyPolicy =
+                                          !_acceptPrivacyPolicy;
                                     });
                                   },
                                   child: Padding(
@@ -564,7 +568,10 @@ class _RegisterPageState extends State<RegisterPage> {
                                           color: Colors.black87,
                                         ),
                                         children: [
-                                          const TextSpan(text: 'I consent to the collection and processing of my personal data as described in the '),
+                                          const TextSpan(
+                                            text:
+                                                'I consent to the collection and processing of my personal data as described in the ',
+                                          ),
                                           WidgetSpan(
                                             child: GestureDetector(
                                               onTap: _showPrivacyPolicy,
@@ -572,8 +579,11 @@ class _RegisterPageState extends State<RegisterPage> {
                                                 'Privacy Policy',
                                                 style: GoogleFonts.poppins(
                                                   fontSize: 13,
-                                                  color: const Color(0xFF2E4F7A),
-                                                  decoration: TextDecoration.underline,
+                                                  color: const Color(
+                                                    0xFF2E4F7A,
+                                                  ),
+                                                  decoration:
+                                                      TextDecoration.underline,
                                                   fontWeight: FontWeight.w500,
                                                 ),
                                               ),
@@ -612,13 +622,15 @@ class _RegisterPageState extends State<RegisterPage> {
                               });
                             },
                             activeColor: const Color(0xFF2E4F7A),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
                           ),
                           Expanded(
                             child: GestureDetector(
                               onTap: () {
                                 setState(() {
-                                  _acceptTermsConditions = !_acceptTermsConditions;
+                                  _acceptTermsConditions =
+                                      !_acceptTermsConditions;
                                 });
                               },
                               child: Padding(
@@ -639,13 +651,16 @@ class _RegisterPageState extends State<RegisterPage> {
                                             style: GoogleFonts.poppins(
                                               fontSize: 13,
                                               color: const Color(0xFF2E4F7A),
-                                              decoration: TextDecoration.underline,
+                                              decoration:
+                                                  TextDecoration.underline,
                                               fontWeight: FontWeight.w500,
                                             ),
                                           ),
                                         ),
                                       ),
-                                      const TextSpan(text: ' of this application.'),
+                                      const TextSpan(
+                                        text: ' of this application.',
+                                      ),
                                     ],
                                   ),
                                 ),

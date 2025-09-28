@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'main.dart';
+import '../../main.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -58,8 +58,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         await supabase.auth.resetPasswordForEmail(
           email,
           redirectTo: kIsWeb
-            ? 'http://localhost:3000/#/create-password'  // For web development
-            : 'eborrow://create-password',  // For mobile
+              ? 'http://localhost:3000/#/create-password' // For web development
+              : 'eborrow://create-password', // For mobile
         );
 
         if (mounted) {

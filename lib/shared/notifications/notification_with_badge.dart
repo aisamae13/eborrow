@@ -1,14 +1,11 @@
-import 'package:eborrow/notifications/notification_service.dart';
+import 'package:eborrow/shared/notifications/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; // Add provider dependency
 
 class RealtimeNotificationBadge extends StatelessWidget {
   final VoidCallback onTap;
 
-  const RealtimeNotificationBadge({
-    super.key,
-    required this.onTap,
-  });
+  const RealtimeNotificationBadge({super.key, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

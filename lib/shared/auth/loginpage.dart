@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'registerpage.dart';
 import 'forgotpasswordpage.dart';
-import 'bottom_nav.dart';
+import '../../navigation/bottom_nav.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'main.dart';
+import '../../main.dart';
 import 'dart:async';
 
 class LoginPage extends StatefulWidget {
@@ -88,7 +88,6 @@ class _LoginPageState extends State<LoginPage> {
 
       // The success message and navigation will be handled by the auth listener
       // No need to navigate here since the auth listener will handle it
-
     } on AuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,7 +133,6 @@ class _LoginPageState extends State<LoginPage> {
 
       // Don't navigate here - let the auth listener handle it
       // The auth state change listener will handle navigation when sign-in completes
-
     } on AuthException catch (e) {
       if (mounted) {
         setState(() {
@@ -432,9 +430,7 @@ class _LoginPageState extends State<LoginPage> {
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : Row(
                             mainAxisAlignment: MainAxisAlignment.center,

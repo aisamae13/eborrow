@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'main.dart';
+import '../../main.dart';
 import 'equipment_detail_page.dart';
-import 'package:eborrow/models/equipment_model.dart'; // Tiyakin na tama ang import path na ito
+import 'package:eborrow/borrower/models/equipment_model.dart'; // Tiyakin na tama ang import path na ito
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({super.key});
@@ -13,7 +13,8 @@ class CatalogPage extends StatefulWidget {
   State<CatalogPage> createState() => _CatalogPageState();
 }
 
-class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClientMixin {
+class _CatalogPageState extends State<CatalogPage>
+    with AutomaticKeepAliveClientMixin {
   late Future<List<Equipment>> _equipmentFuture;
   late Future<List<String>> _categoriesFuture;
   String selectedCategory = 'All';
@@ -76,7 +77,10 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
       }
 
       if (selectedCategory != 'All') {
-        query = query.eq('equipment_categories.category_name', selectedCategory);
+        query = query.eq(
+          'equipment_categories.category_name',
+          selectedCategory,
+        );
       }
 
       if (_showAvailableOnly) {
@@ -130,8 +134,8 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
         title: Text(
           'Catalog',
           style: GoogleFonts.poppins(
-           fontSize: 24,
-          fontWeight: FontWeight.w500,
+            fontSize: 24,
+            fontWeight: FontWeight.w500,
             color: Colors.white,
           ),
         ),
@@ -187,7 +191,9 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
                 return const Center(child: CircularProgressIndicator());
               }
               if (snapshot.hasError) {
-                return Center(child: Text('Error loading categories: ${snapshot.error}'));
+                return Center(
+                  child: Text('Error loading categories: ${snapshot.error}'),
+                );
               }
 
               final categories = snapshot.data!;
@@ -216,7 +222,9 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
                         checkmarkColor: Colors.white,
                         labelStyle: GoogleFonts.poppins(
                           color: isSelected ? Colors.white : Colors.black87,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                       ),
                     );
@@ -255,12 +263,13 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
                   },
                   child: GridView.builder(
                     padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 200,
-                      childAspectRatio: 0.75,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 200,
+                          childAspectRatio: 0.75,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
                     itemCount: equipmentList.length,
                     itemBuilder: (context, index) {
                       return GestureDetector(
@@ -268,7 +277,9 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => EquipmentDetailPage(equipment: equipmentList[index]),
+                              builder: (context) => EquipmentDetailPage(
+                                equipment: equipmentList[index],
+                              ),
                             ),
                           );
                         },
@@ -296,7 +307,10 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 16.0,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -448,16 +462,21 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
               child: Stack(
                 children: [
                   Center(
-                    child: (equipment.imageUrl != null && equipment.imageUrl!.isNotEmpty)
+                    child:
+                        (equipment.imageUrl != null &&
+                            equipment.imageUrl!.isNotEmpty)
                         ? Padding(
                             padding: const EdgeInsets.all(8.0),
                             child: Image.network(
                               equipment.imageUrl!,
                               fit: BoxFit.contain,
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return const Center(child: CircularProgressIndicator());
-                              },
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return const Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  },
                               errorBuilder: (context, error, stackTrace) {
                                 return Icon(
                                   fallbackIcon,
@@ -473,7 +492,10 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
                     top: 12,
                     right: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: isAvailable ? Colors.green : Colors.red,
                         borderRadius: BorderRadius.circular(8),
@@ -515,7 +537,10 @@ class _CatalogPageState extends State<CatalogPage> with AutomaticKeepAliveClient
                   Flexible(
                     child: Text(
                       specsString,
-                      style: GoogleFonts.poppins(color: Colors.grey[600], fontSize: 12),
+                      style: GoogleFonts.poppins(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),

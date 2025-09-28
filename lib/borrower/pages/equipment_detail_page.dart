@@ -1,8 +1,8 @@
-import 'package:eborrow/models/equipment_model.dart';
+import 'package:eborrow/borrower/models/equipment_model.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'borrow_request_page.dart';
-import 'main.dart';
+import '../../main.dart';
 
 class EquipmentDetailPage extends StatefulWidget {
   final Equipment equipment;
@@ -16,7 +16,7 @@ class EquipmentDetailPage extends StatefulWidget {
 class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
   // We've removed the _isLoading variable and _requestToBorrow function from here.
 
- void _showReportIssueDialog() {
+  void _showReportIssueDialog() {
     final descriptionController = TextEditingController();
     showDialog(
       context: context,
@@ -43,14 +43,17 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                 Text(
                   'Report an Issue',
                   style: GoogleFonts.poppins(
-                      fontSize: 20, fontWeight: FontWeight.bold),
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 TextField(
                   controller: descriptionController,
                   maxLines: 4,
                   decoration: InputDecoration(
-                    hintText: "Please describe the problem with this equipment...",
+                    hintText:
+                        "Please describe the problem with this equipment...",
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -60,11 +63,14 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    OutlinedButton( // Use OutlinedButton for the outline effect
+                    OutlinedButton(
+                      // Use OutlinedButton for the outline effect
                       onPressed: () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF2B326B),
-                        side: const BorderSide(color: Color(0xFF2B326B)), // Sets the border color
+                        side: const BorderSide(
+                          color: Color(0xFF2B326B),
+                        ), // Sets the border color
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -159,7 +165,9 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
               height: 250,
               width: double.infinity,
               color: Colors.grey[200],
-              child: (widget.equipment.imageUrl != null && widget.equipment.imageUrl!.isNotEmpty)
+              child:
+                  (widget.equipment.imageUrl != null &&
+                      widget.equipment.imageUrl!.isNotEmpty)
                   ? Image.network(
                       widget.equipment.imageUrl!,
                       fit: BoxFit.contain,
@@ -190,7 +198,9 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                       widget.equipment.status.toUpperCase(),
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.bold,
-                        color: isAvailable ? Colors.green[800] : Colors.red[800],
+                        color: isAvailable
+                            ? Colors.green[800]
+                            : Colors.red[800],
                         letterSpacing: 1,
                       ),
                     ),
@@ -215,7 +225,9 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                   const Divider(height: 32),
                   _buildDetailSection(
                     'Specifications',
-                    widget.equipment.specifications.entries.map((e) => '${e.key}: ${e.value}').join('\n'),
+                    widget.equipment.specifications.entries
+                        .map((e) => '${e.key}: ${e.value}')
+                        .join('\n'),
                   ),
                   if (widget.equipment.description != null)
                     _buildDetailSection(
@@ -237,7 +249,8 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => BorrowRequestPage(equipment: widget.equipment),
+                      builder: (context) =>
+                          BorrowRequestPage(equipment: widget.equipment),
                     ),
                   );
                 }
