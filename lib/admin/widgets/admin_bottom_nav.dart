@@ -3,6 +3,7 @@ import '../pages/admin_dashboard.dart';
 import '../pages/requests_management_page.dart'; // Fixed: Added 's'
 import '../pages/equipment_management_page.dart';
 import '../pages/admin_profile_page.dart';
+import '../pages/user_management_page.dart';
 
 class AdminBottomNav extends StatefulWidget {
   const AdminBottomNav({super.key});
@@ -20,10 +21,11 @@ class _AdminBottomNavState extends State<AdminBottomNav> {
   void initState() {
     super.initState();
     _pages = [
-      const AdminDashboard(),
-      const RequestsManagementPage(),
-      const EquipmentManagementPage(),
-      const AdminProfilePage(),
+       const AdminDashboard(),
+    const RequestsManagementPage(),
+    const EquipmentManagementPage(),
+     const UserManagementScreen(),
+    const AdminProfilePage(),
     ];
   }
 
@@ -44,7 +46,7 @@ class _AdminBottomNavState extends State<AdminBottomNav> {
         selectedItemColor: const Color(0xFF2B326B),
         unselectedItemColor: Colors.grey,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
             icon: Icon(Icons.assignment),
             label: 'Requests',
@@ -52,6 +54,10 @@ class _AdminBottomNavState extends State<AdminBottomNav> {
           BottomNavigationBarItem(
             icon: Icon(Icons.inventory_2),
             label: 'Equipment',
+          ),
+             BottomNavigationBarItem(
+            icon: Icon(Icons.people),
+            label: 'Users',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],

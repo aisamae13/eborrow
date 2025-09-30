@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:provider/provider.dart'; // Add this import
+import 'package:provider/provider.dart';
+// 💡 Import the new configuration file
+import 'config.dart';
 import 'shared/auth/landingpage.dart';
 import 'shared/auth/loginpage.dart';
 import 'navigation/bottom_nav.dart';
 import 'shared/auth/createnewpasswordpage.dart';
-import 'shared/notifications/notification_service.dart'; // Add this import
+import 'shared/notifications/notification_service.dart';
 
 import 'admin/services/admin_auth_service.dart';
 import 'admin/widgets/admin_bottom_nav.dart';
@@ -21,9 +23,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: 'https://ujnzsycdtlwcwlrafjgk.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbnpzeWNkdGx3Y3dscmFmamdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0NzE2MjcsImV4cCI6MjA3MTA0NzYyN30.URXG5ytfPRdG-ZDCq26hCyd0uY18dBUrPa7j0SREUV4',
+    // 🔑 Use the variables from the config file
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
     debug: kDebugMode,
   );
 

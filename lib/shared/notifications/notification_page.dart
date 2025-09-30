@@ -18,14 +18,20 @@ class _NotificationPageState extends State<NotificationPage> {
   @override
   void initState() {
     super.initState();
-    // Load notifications when page opens
-    _loadNotifications();
+
+    // FIX: Defer _loadNotifications() until after the widget has finished building
+    // the current frame. This prevents the "setState during build" error, and correctly
+    // triggers the initial fast loading state.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadNotifications();
+    });
   }
 
   void _loadNotifications() {
     final userId = supabase.auth.currentUser?.id;
     if (userId != null) {
       // Use the provider to load notifications
+      // This call internally calls notifyListeners(), hence the need for deferral.
       context.read<NotificationProvider>().loadNotifications(userId);
     }
   }

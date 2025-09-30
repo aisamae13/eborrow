@@ -1,6 +1,3 @@
-// This file only contains the data model
-// Add this if your class uses Color or other Flutter types
-
 class Equipment {
   final int equipmentId;
   final String name;
@@ -29,20 +26,44 @@ class Equipment {
   });
 
   factory Equipment.fromMap(Map<String, dynamic> map) {
+    // Handle category name from multiple possible sources
+    String getCategoryName() {
+      // First, check if it's already flattened
+      if (map['categoryName'] != null) {
+        return map['categoryName'];
+      }
+      // Check nested structure from join
+      if (map['equipment_categories']?['category_name'] != null) {
+        return map['equipment_categories']['category_name'];
+      }
+      // Fallback to category varchar field
+      if (map['category'] != null) {
+        return map['category'];
+      }
+      return 'Uncategorized';
+    }
+
+    // Handle specifications - JSONB can come as Map or need parsing
+    Map<String, dynamic> getSpecifications() {
+      final specs = map['specifications'];
+      if (specs == null) return {};
+      if (specs is Map<String, dynamic>) return specs;
+      if (specs is Map) return Map<String, dynamic>.from(specs);
+      return {};
+    }
+
     return Equipment(
-      equipmentId: map['equipment_id'],
-      name: map['name'],
-      model: map['model'],
-      brand: map['brand'],
-      categoryId: map['category_id'],
-      categoryName: map['equipment_categories']?['category_name'] ?? 'Uncategorized',
-      qrCode: map['qr_code'],
-      description: map['description'],
-      specifications: (map['specifications'] is Map<String, dynamic>)
-          ? map['specifications']
-          : {},
-      status: map['status'],
-      imageUrl: map['image_url'],
+      equipmentId: map['equipment_id'] as int,
+      name: map['name'] as String,
+      model: map['model'] as String?,
+      brand: map['brand'] as String?,
+      categoryId: map['category_id'] as int,
+      categoryName: getCategoryName(),
+      qrCode: map['qr_code'] as String,
+      description: map['description'] as String?,
+      specifications: getSpecifications(),
+      status: map['status'] as String? ?? 'available',
+      imageUrl: map['image_url'] as String?,
     );
   }
 }

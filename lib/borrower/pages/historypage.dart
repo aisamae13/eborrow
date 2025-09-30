@@ -18,6 +18,7 @@ class _HistoryPageState extends State<HistoryPage>
     with TickerProviderStateMixin {
   int _selectedIndex = 0;
   Future<List<BorrowRequest>>? _requestsFuture;
+  bool _isRefreshing = false;
 
   late PageController _pageController;
   late AnimationController _animationController;
@@ -78,9 +79,27 @@ class _HistoryPageState extends State<HistoryPage>
   }
 
   Future<void> _refreshData() async {
+    if (_isRefreshing) return; // Prevent multiple simultaneous refreshes
+
     setState(() {
-      _requestsFuture = _fetchBorrowRequests();
+      _isRefreshing = true;
     });
+
+    try {
+      final newData = await _fetchBorrowRequests();
+      if (mounted) {
+        setState(() {
+          _requestsFuture = Future.value(newData);
+          _isRefreshing = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
   }
 
   void _onTabSelected(int index) {
@@ -101,7 +120,6 @@ class _HistoryPageState extends State<HistoryPage>
     }
   }
 
-  // Updated to use notification system
   Future<void> _cancelRequest(BorrowRequest request) async {
     final bool? confirm = await showDialog(
       context: context,
@@ -124,14 +142,20 @@ class _HistoryPageState extends State<HistoryPage>
     );
 
     if (confirm == true) {
+      // Define the Admin's ID
+      const String adminUserId = '33e2d8dd-bbc6-4bc5-8347-d8dcf2981420';
+
+      // Get borrower's name for the admin notification
+      final currentUserName = supabase.auth.currentUser?.email?.split('@').first ?? 'A Borrower';
+
       try {
-        // Create notification for the cancellation
+        // 1. Notify the BORROWER (Self-Notification for UX)
         await NotificationService.createNotification(
           userId: request.borrowerId,
           title: 'Request Cancelled',
           message:
               'You have cancelled your borrow request for "${request.equipmentName}".',
-          type: NotificationType.general,
+          type: NotificationType.requestRejected,
           metadata: {
             'equipment_name': request.equipmentName,
             'borrow_request_id': request.requestId,
@@ -139,7 +163,7 @@ class _HistoryPageState extends State<HistoryPage>
           },
         );
 
-        // Update the request status
+        // 2. Update the database
         await supabase
             .from('borrow_requests')
             .update({'status': 'cancelled'})
@@ -155,6 +179,9 @@ class _HistoryPageState extends State<HistoryPage>
           _refreshData();
         }
       } catch (e) {
+        print("--- ❌ CANCELLATION FAILED ---");
+        print(e);
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -174,69 +201,61 @@ class _HistoryPageState extends State<HistoryPage>
         children: [
           _buildCustomAppBar(),
           Expanded(
-            child: FutureBuilder<List<BorrowRequest>>(
-              future: _requestsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return RefreshIndicator(
-                    onRefresh: _refreshData,
-                    child: Center(child: Text('Error: ${snapshot.error}')),
+            child: RefreshIndicator(
+              onRefresh: _refreshData,
+              child: FutureBuilder<List<BorrowRequest>>(
+                future: _requestsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting && !_isRefreshing) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError) {
+                    return _buildErrorState(snapshot.error.toString());
+                  }
+
+                  final allRequests = snapshot.data ?? [];
+                  if (allRequests.isEmpty) {
+                    return _buildScrollableEmptyState();
+                  }
+
+                  // Clear status categorization
+                  final activeItems = allRequests
+                      .where(
+                        (r) => [
+                          'pending', // Waiting for approval
+                          'approved', // Approved, ready for pickup
+                          'active', // Currently borrowed
+                          'overdue', // Past due date
+                        ].contains(r.status.toLowerCase()),
+                      )
+                      .toList();
+
+                  final historyItems = allRequests
+                      .where(
+                        (r) => [
+                          'returned', // Successfully returned
+                          'rejected', // Denied by admin
+                          'cancelled', // Cancelled by user
+                          'expired', // Request expired (optional)
+                        ].contains(r.status.toLowerCase()),
+                      )
+                      .toList();
+
+                  return PageView(
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _selectedIndex = index;
+                      });
+                    },
+                    children: [
+                      _buildItemsList(activeItems),
+                      _buildItemsList(historyItems),
+                    ],
                   );
-                }
-
-                final allRequests = snapshot.data!;
-                if (allRequests.isEmpty) {
-                  return RefreshIndicator(
-                    onRefresh: _refreshData,
-                    child: Stack(children: [ListView(), _buildEmptyState()]),
-                  );
-                }
-
-                // Clear status categorization
-                final activeItems = allRequests
-                    .where(
-                      (r) => [
-                        'pending', // Waiting for approval
-                        'approved', // Approved, ready for pickup
-                        'active', // Currently borrowed
-                        'overdue', // Past due date
-                      ].contains(r.status.toLowerCase()),
-                    )
-                    .toList();
-
-                final historyItems = allRequests
-                    .where(
-                      (r) => [
-                        'returned', // Successfully returned
-                        'rejected', // Denied by admin
-                        'cancelled', // Cancelled by user
-                        'expired', // Request expired (optional)
-                      ].contains(r.status.toLowerCase()),
-                    )
-                    .toList();
-
-                return PageView(
-                  controller: _pageController,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _selectedIndex = index;
-                    });
-                  },
-                  children: [
-                    RefreshIndicator(
-                      onRefresh: _refreshData,
-                      child: _buildItemsList(activeItems),
-                    ),
-                    RefreshIndicator(
-                      onRefresh: _refreshData,
-                      child: _buildItemsList(historyItems),
-                    ),
-                  ],
-                );
-              },
+                },
+              ),
             ),
           ),
         ],
@@ -343,11 +362,62 @@ class _HistoryPageState extends State<HistoryPage>
     );
   }
 
+  Widget _buildScrollableEmptyState() {
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: _buildEmptyState(isHistory: _selectedIndex == 1),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorState(String error) {
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                const SizedBox(height: 16),
+                Text(
+                  'Error loading data',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    'Pull down to retry',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildItemsList(List<BorrowRequest> items) {
     if (items.isEmpty) {
-      return _buildEmptyState(isHistory: _selectedIndex == 1);
+      return _buildScrollableEmptyState();
     }
+
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16.0),
       itemCount: items.length,
       itemBuilder: (context, index) {

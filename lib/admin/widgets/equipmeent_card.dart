@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import '../services/equipment_management_service.dart';
 
 class EquipmentCard extends StatelessWidget {
   final Map<String, dynamic> equipment;
@@ -75,16 +74,32 @@ class EquipmentCard extends StatelessWidget {
     Color statusColor,
     IconData statusIcon,
   ) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 600;
+    final isMediumScreen = screenWidth >= 600 && screenWidth < 1024;
+
+    // Responsive font sizes
+    final nameFontSize = isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0);
+    final brandFontSize = isSmallScreen ? 10.0 : (isMediumScreen ? 11.0 : 12.0);
+    final categoryFontSize = isSmallScreen ? 9.0 : 10.0;
+    final statusFontSize = isSmallScreen ? 7.0 : 8.0;
+    final buttonLabelSize = isSmallScreen ? 9.0 : 10.0;
+    final iconSize = isSmallScreen ? 14.0 : 16.0;
+    final statusIconSize = isSmallScreen ? 9.0 : 10.0;
+
+    // Responsive padding
+    final cardPadding = isSmallScreen ? 6.0 : 8.0;
+    final buttonPadding = isSmallScreen ? 4.0 : 6.0;
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      clipBehavior: Clip.antiAlias, // ✅ CHANGED: Helps contain child widgets
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ✅ CHANGED: Replaced fixed-height SizedBox with a flexible AspectRatio
           AspectRatio(
-            aspectRatio: 16 / 10, // Keeps image proportions consistent
+            aspectRatio: 16 / 10,
             child: Container(
               color: Colors.grey[100],
               child: imageUrl != null && imageUrl.isNotEmpty
@@ -92,117 +107,142 @@ class EquipmentCard extends StatelessWidget {
                       imageUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
-                        return _buildDefaultIcon(category);
+                        return _buildDefaultIcon(category, screenWidth);
                       },
                     )
-                  : _buildDefaultIcon(category),
+                  : _buildDefaultIcon(category, screenWidth),
             ),
           ),
 
-          // ✅ CHANGED: Replaced fixed-height SizedBox with Expanded
-          // This makes the content area fill the remaining space.
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Name and Status Badge
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          name,
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(statusIcon, color: statusColor, size: 10),
-                            const SizedBox(width: 4),
-                            Text(
-                              _getStatusText(status),
-                              style: GoogleFonts.poppins(
-                                color: statusColor,
-                                fontSize: 8,
-                                fontWeight: FontWeight.w500,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  physics: const NeverScrollableScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(cardPadding),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Name and Status Badge
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: nameFontSize,
+                                    height: 1.2,
+                                  ),
+                                  maxLines: isSmallScreen ? 2 : 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
+                              SizedBox(width: isSmallScreen ? 4 : 8),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isSmallScreen ? 4 : 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(statusIcon, color: statusColor, size: statusIconSize),
+                                    SizedBox(width: isSmallScreen ? 2 : 4),
+                                    Text(
+                                      _getStatusText(status),
+                                      style: GoogleFonts.poppins(
+                                        color: statusColor,
+                                        fontSize: statusFontSize,
+                                        fontWeight: FontWeight.w500,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          SizedBox(height: isSmallScreen ? 2 : 4),
+
+                          // Brand
+                          if (brand.isNotEmpty)
+                            Text(
+                              brand,
+                              style: GoogleFonts.poppins(
+                                color: Colors.grey[600],
+                                fontSize: brandFontSize,
+                                height: 1.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
 
-                  const SizedBox(height: 4),
+                          // Category
+                          Text(
+                            category,
+                            style: GoogleFonts.poppins(
+                              color: Colors.grey[500],
+                              fontSize: categoryFontSize,
+                              height: 1.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
 
-                  // Brand
-                  if (brand.isNotEmpty)
-                    Text(
-                      brand,
-                      style: GoogleFonts.poppins(
-                        color: Colors.grey[600],
-                        fontSize: 12,
+                          SizedBox(height: isSmallScreen ? 4 : 8),
+
+                          // Horizontal Action Buttons with Labels
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildLabeledButton(
+                                'QR',
+                                Icons.qr_code,
+                                Colors.blue,
+                                () => _showQRCode(context, equipmentId, name),
+                                buttonPadding,
+                                iconSize,
+                                buttonLabelSize,
+                              ),
+                              _buildLabeledButton(
+                                'Edit',
+                                Icons.edit,
+                                Colors.orange,
+                                onEdit,
+                                buttonPadding,
+                                iconSize,
+                                buttonLabelSize,
+                              ),
+                              _buildLabeledButton(
+                                'More',
+                                Icons.more_vert,
+                                Colors.grey[600]!,
+                                () => _showOptionsMenu(context),
+                                buttonPadding,
+                                iconSize,
+                                buttonLabelSize,
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-
-                  // Category
-                  Text(
-                    category,
-                    style: GoogleFonts.poppins(
-                      color: Colors.grey[500],
-                      fontSize: 10,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-
-                  // This Spacer pushes the buttons to the bottom
-                  const Spacer(),
-
-                  // Horizontal Action Buttons with Labels
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildLabeledButton(
-                        'QR',
-                        Icons.qr_code,
-                        Colors.blue,
-                        () => _showQRCode(context, equipmentId, name),
-                      ),
-                      _buildLabeledButton(
-                        'Edit',
-                        Icons.edit,
-                        Colors.orange,
-                        onEdit,
-                      ),
-                      _buildLabeledButton(
-                        'More',
-                        Icons.more_vert,
-                        Colors.grey[600]!,
-                        () => _showOptionsMenu(context),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ],
@@ -210,12 +250,14 @@ class EquipmentCard extends StatelessWidget {
     );
   }
 
-  // ✅ NEW: Labeled button for better UX
   Widget _buildLabeledButton(
     String label,
     IconData icon,
     Color color,
     VoidCallback onPressed,
+    double padding,
+    double iconSize,
+    double labelSize,
   ) {
     return GestureDetector(
       onTap: onPressed,
@@ -223,19 +265,19 @@ class EquipmentCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: EdgeInsets.all(padding),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 16),
+            child: Icon(icon, color: color, size: iconSize),
           ),
           const SizedBox(height: 2),
           Text(
             label,
             style: GoogleFonts.poppins(
               color: color,
-              fontSize: 10,
+              fontSize: labelSize,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -256,20 +298,37 @@ class EquipmentCard extends StatelessWidget {
     Color statusColor,
     IconData statusIcon,
   ) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 600;
+    final isMediumScreen = screenWidth >= 600 && screenWidth < 1024;
+
+    // Responsive sizes for list view
+    final imageSize = isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0);
+    final nameFontSize = isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0);
+    final brandFontSize = isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0);
+    final categoryFontSize = isSmallScreen ? 10.0 : (isMediumScreen ? 11.0 : 12.0);
+    final descriptionFontSize = isSmallScreen ? 11.0 : 12.0;
+    final statusFontSize = isSmallScreen ? 10.0 : 12.0;
+    final statusIconSize = isSmallScreen ? 12.0 : 14.0;
+    final buttonFontSize = isSmallScreen ? 11.0 : 12.0;
+    final buttonIconSize = isSmallScreen ? 14.0 : 16.0;
+    final cardPadding = isSmallScreen ? 12.0 : 16.0;
+    final spacing = isSmallScreen ? 12.0 : 16.0;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(cardPadding),
         child: Column(
           children: [
             Row(
               children: [
                 // Image or Icon
                 Container(
-                  width: 80,
-                  height: 80,
+                  width: imageSize,
+                  height: imageSize,
                   decoration: BoxDecoration(
                     color: Colors.grey[100],
                     borderRadius: BorderRadius.circular(8),
@@ -281,14 +340,14 @@ class EquipmentCard extends StatelessWidget {
                             imageUrl,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
-                              return _buildDefaultIcon(category);
+                              return _buildDefaultIcon(category, screenWidth);
                             },
                           ),
                         )
-                      : _buildDefaultIcon(category),
+                      : _buildDefaultIcon(category, screenWidth),
                 ),
 
-                const SizedBox(width: 16),
+                SizedBox(width: spacing),
 
                 // Content
                 Expanded(
@@ -302,13 +361,16 @@ class EquipmentCard extends StatelessWidget {
                               name,
                               style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                fontSize: nameFontSize,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          SizedBox(width: isSmallScreen ? 4 : 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 6 : 8,
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
@@ -318,13 +380,13 @@ class EquipmentCard extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(statusIcon, color: statusColor, size: 14),
+                                Icon(statusIcon, color: statusColor, size: statusIconSize),
                                 const SizedBox(width: 4),
                                 Text(
                                   _getStatusText(status),
                                   style: GoogleFonts.poppins(
                                     color: statusColor,
-                                    fontSize: 12,
+                                    fontSize: statusFontSize,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -341,25 +403,29 @@ class EquipmentCard extends StatelessWidget {
                           brand,
                           style: GoogleFonts.poppins(
                             color: Colors.grey[600],
-                            fontSize: 14,
+                            fontSize: brandFontSize,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
 
                       Text(
                         category,
                         style: GoogleFonts.poppins(
                           color: Colors.grey[500],
-                          fontSize: 12,
+                          fontSize: categoryFontSize,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
 
-                      if (description.isNotEmpty) ...[
+                      if (description.isNotEmpty && !isSmallScreen) ...[
                         const SizedBox(height: 4),
                         Text(
                           description,
                           style: GoogleFonts.poppins(
                             color: Colors.grey[700],
-                            fontSize: 12,
+                            fontSize: descriptionFontSize,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -371,40 +437,88 @@ class EquipmentCard extends StatelessWidget {
               ],
             ),
 
-            const SizedBox(height: 16),
+            SizedBox(height: spacing),
 
-            // ✅ Horizontal Action Buttons Row for List View
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Expanded(
-                  child: _buildListActionButton(
-                    'View QR Code',
-                    Icons.qr_code,
-                    Colors.blue,
-                    () => _showQRCode(context, equipmentId, name),
+            // Action Buttons Row - Responsive layout
+            isSmallScreen
+                ? Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildListActionButton(
+                              'QR Code',
+                              Icons.qr_code,
+                              Colors.blue,
+                              () => _showQRCode(context, equipmentId, name),
+                              buttonFontSize,
+                              buttonIconSize,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildListActionButton(
+                              'Edit',
+                              Icons.edit,
+                              Colors.orange,
+                              onEdit,
+                              buttonFontSize,
+                              buttonIconSize,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: _buildListActionButton(
+                          'Options',
+                          Icons.more_horiz,
+                          Colors.grey[600]!,
+                          () => _showOptionsMenu(context),
+                          buttonFontSize,
+                          buttonIconSize,
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: _buildListActionButton(
+                          'View QR Code',
+                          Icons.qr_code,
+                          Colors.blue,
+                          () => _showQRCode(context, equipmentId, name),
+                          buttonFontSize,
+                          buttonIconSize,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildListActionButton(
+                          'Edit',
+                          Icons.edit,
+                          Colors.orange,
+                          onEdit,
+                          buttonFontSize,
+                          buttonIconSize,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildListActionButton(
+                          'Options',
+                          Icons.more_horiz,
+                          Colors.grey[600]!,
+                          () => _showOptionsMenu(context),
+                          buttonFontSize,
+                          buttonIconSize,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildListActionButton(
-                    'Edit',
-                    Icons.edit,
-                    Colors.orange,
-                    onEdit,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildListActionButton(
-                    'Options',
-                    Icons.more_horiz,
-                    Colors.grey[600]!,
-                    () => _showOptionsMenu(context),
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
@@ -416,14 +530,16 @@ class EquipmentCard extends StatelessWidget {
     IconData icon,
     Color color,
     VoidCallback onPressed,
+    double fontSize,
+    double iconSize,
   ) {
     return OutlinedButton.icon(
       onPressed: onPressed,
-      icon: Icon(icon, size: 16, color: color),
+      icon: Icon(icon, size: iconSize, color: color),
       label: Text(
         label,
         style: GoogleFonts.poppins(
-          fontSize: 12,
+          fontSize: fontSize,
           color: color,
           fontWeight: FontWeight.w500,
         ),
@@ -436,7 +552,7 @@ class EquipmentCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDefaultIcon(String category) {
+  Widget _buildDefaultIcon(String category, double screenWidth) {
     IconData iconData;
     Color iconColor;
 
@@ -466,8 +582,13 @@ class EquipmentCard extends StatelessWidget {
         iconColor = Colors.grey;
     }
 
+    // Responsive icon size based on screen width
+    final iconSize = isListView
+        ? (screenWidth < 600 ? 28.0 : 32.0)
+        : (screenWidth < 600 ? 40.0 : 48.0);
+
     return Center(
-      child: Icon(iconData, size: isListView ? 32 : 48, color: iconColor),
+      child: Icon(iconData, size: iconSize, color: iconColor),
     );
   }
 
@@ -506,58 +627,191 @@ class EquipmentCard extends StatelessWidget {
   }
 
   void _showQRCode(
-    BuildContext context,
-    int equipmentId,
-    String equipmentName,
-  ) {
-    final qrData = EquipmentManagementService.generateQRData(
-      equipmentId,
-      equipmentName,
-    );
+  BuildContext context,
+  int equipmentId,
+  String equipmentName,
+) {
+  // ✅ FIX: Use the actual QR code from the database
+  final qrCode = equipment['qr_code'] ?? 'UNKNOWN-${equipmentId.toString().padLeft(3, '0')}';
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isSmallScreen = screenWidth < 600;
+  final dialogWidth = isSmallScreen ? screenWidth * 0.9 : 400.0;
+  final qrSize = isSmallScreen ? 200.0 : 240.0;
+
+  showDialog(
+  context: context,
+  builder: (context) => Dialog(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    child: Container(
+      width: dialogWidth,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85, // Add max height
+      ),
+      padding: const EdgeInsets.all(24),
+      child: SingleChildScrollView( // ✅ Add scroll capability
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
+            // Header with icon
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2B326B).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.qr_code_2,
+                color: Color(0xFF2B326B),
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Title
+            Text(
+              'Equipment QR Code',
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF2B326B),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // QR Code Number
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFC107).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFFFC107)),
+              ),
               child: Text(
-                'QR Code - $equipmentName',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                overflow: TextOverflow.ellipsis,
+                qrCode,
+                style: GoogleFonts.robotoMono(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF2B326B),
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // QR Code with styled container
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[300]!, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: QrImageView(
+                data: qrCode,
+                version: QrVersions.auto,
+                size: qrSize,
+                backgroundColor: Colors.white,
+                errorCorrectionLevel: QrErrorCorrectLevel.H,
+                gapless: true,
+                eyeStyle: const QrEyeStyle(
+                  eyeShape: QrEyeShape.square,
+                  color: Color(0xFF2B326B),
+                ),
+                dataModuleStyle: const QrDataModuleStyle(
+                  dataModuleShape: QrDataModuleShape.square,
+                  color: Color(0xFF2B326B),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Equipment Info
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoRow('Name:', equipmentName),
+                  const SizedBox(height: 8),
+                  _buildInfoRow('Brand:', equipment['brand'] ?? 'N/A'),
+                  const SizedBox(height: 8),
+                  _buildInfoRow('Category:', equipment['category'] ?? 'N/A'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Close Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2B326B),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Close',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ),
           ],
         ),
-        content: SizedBox(
-          width: 200,
-          height: 200,
-          child: QrImageView(
-            data: qrData,
-            version: QrVersions.auto,
-            size: 200,
-            backgroundColor: Colors.white,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Print/Share functionality coming soon!'),
-                ),
-              );
-            },
-            child: const Text('Print'),
-          ),
-        ],
       ),
-    );
-  }
+    ),
+  ),
+);
+}
+
+// Helper method for info rows
+Widget _buildInfoRow(String label, String value) {
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: GoogleFonts.poppins(
+          fontSize: 13,
+          color: Colors.grey[600],
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+          textAlign: TextAlign.end,
+        ),
+      ),
+    ],
+  );
+}
 
   void _showOptionsMenu(BuildContext context) {
     showModalBottomSheet(
@@ -576,7 +830,6 @@ class EquipmentCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Status Change Options
             _buildOptionItem(
               Icons.check_circle,
               'Mark as Available',
@@ -602,7 +855,6 @@ class EquipmentCard extends StatelessWidget {
 
             const Divider(),
 
-            // Other Options
             _buildOptionItem(Icons.edit, 'Edit Equipment', Colors.blue, () {
               Navigator.pop(context);
               onEdit();

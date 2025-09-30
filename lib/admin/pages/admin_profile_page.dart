@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../main.dart';
 import '../../shared/auth/landingpage.dart';
 import '../services/admin_auth_service.dart';
+import 'admin_settings_page.dart';
 
 class AdminProfilePage extends StatefulWidget {
   const AdminProfilePage({super.key});
@@ -174,7 +175,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
         title: Text(
           'Admin Profile',
           style: GoogleFonts.poppins(
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w500,
             color: Colors.white,
           ),
         ),
@@ -191,7 +192,10 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
                   icon: Icons.settings,
                   title: 'Admin Settings',
                   onTap: () {
-                    // Navigate to admin settings
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AdminSettingsPage()),
+                    );
                   },
                 ),
                 _buildOptionTile(
@@ -222,13 +226,57 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const CircleAvatar(
-            radius: 40,
-            backgroundColor: Color(0xFF2B326B),
-            child: Icon(
-              Icons.admin_panel_settings,
-              size: 40,
-              color: Colors.white,
+          // Admin Avatar with default image
+          Center(
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFF2B326B),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipOval(
+                child: Image.network(
+                  'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback if image fails to load
+                    return Container(
+                      color: const Color(0xFF2B326B),
+                      child: const Icon(
+                        Icons.admin_panel_settings,
+                        size: 50,
+                        color: Colors.white,
+                      ),
+                    );
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: Colors.grey[200],
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                          color: const Color(0xFF2B326B),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 16),

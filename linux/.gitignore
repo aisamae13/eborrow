@@ -1,1 +1,8 @@
 flutter/ephemeral
+# 1. Config file na may API Keys (Kung sinunod mo ang payo na gumamit ng config.dart)
+# ⚠️ Siguraduhin na ang file na ito ay naglalaman ng iyong Supabase URL at Anon Key.
+/lib/config.dart
+
+# 2. Environment files (Kung gumamit ka ng flutter_dotenv)
+.env
+.env.*

@@ -5,6 +5,8 @@ import '../../main.dart';
 import '../models/equipment_model.dart';
 import 'request_submitted_page.dart';
 import '../models/borrow_request.dart';
+// NOTE: NotificationService import is not needed here as it's not directly called.
+// If it was imported, it is safe to keep it, but the call should be gone.
 
 class BorrowRequestPage extends StatefulWidget {
   final Equipment equipment;
@@ -222,7 +224,7 @@ class _BorrowRequestPageState extends State<BorrowRequestPage> {
         throw 'User is not logged in.';
       }
 
-      // --- MODIFICATION: Use .select() to get the new request back ---
+      // 1. INSERT THE REQUEST. THE DATABASE TRIGGER HANDLES THE NOTIFICATION.
       final response = await supabase
           .from('borrow_requests')
           .insert({
@@ -236,11 +238,15 @@ class _BorrowRequestPageState extends State<BorrowRequestPage> {
           .select('*, equipment(name)')
           .single(); // <-- Chained .select().single()
 
+      // ⚠️ Tiningnan ko ang code, at walang tawag sa NotificationService dito.
+      // Ang logic ay MALINIS na at dapat gumawa lang ng ISANG notification
+      // (yung galing sa trigger)
+
       if (mounted) {
         // Create a BorrowRequest object from the response
         final newRequest = BorrowRequest.fromMap(response);
 
-        // --- MODIFICATION: Navigate to the new screen instead of showing a SnackBar ---
+        // Navigate to the success screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => RequestSubmittedPage(request: newRequest),

@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../main.dart';
 import 'equipment_detail_page.dart';
-import 'package:eborrow/borrower/models/equipment_model.dart'; // Tiyakin na tama ang import path na ito
+import 'package:eborrow/borrower/models/equipment_model.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({super.key});
@@ -46,7 +46,8 @@ class _CatalogPageState extends State<CatalogPage>
     try {
       final response = await supabase
           .from('equipment_categories')
-          .select('category_name');
+          .select('category_name')
+          .order('category_name');
 
       final categoryList = response
           .map((map) => map['category_name'] as String)
@@ -68,28 +69,54 @@ class _CatalogPageState extends State<CatalogPage>
 
   Future<List<Equipment>> _fetchEquipment() async {
     try {
+      // Use left join instead of inner join to get all equipment
       var query = supabase
           .from('equipment')
-          .select('*, equipment_categories!inner(category_name)');
+          .select('*, equipment_categories(category_name)');
 
       if (_searchQuery.isNotEmpty) {
-        query = query.ilike('name', '%$_searchQuery%');
+        query = query.or(
+          'name.ilike.%$_searchQuery%,brand.ilike.%$_searchQuery%,model.ilike.%$_searchQuery%',
+        );
       }
 
       if (selectedCategory != 'All') {
-        query = query.eq(
-          'equipment_categories.category_name',
-          selectedCategory,
-        );
+        // Filter by category name from the join OR from the category field
+        final categoryData = await supabase
+            .from('equipment_categories')
+            .select('category_id')
+            .eq('category_name', selectedCategory)
+            .maybeSingle();
+
+        if (categoryData != null) {
+          query = query.eq('category_id', categoryData['category_id']);
+        }
       }
 
       if (_showAvailableOnly) {
         query = query.eq('status', 'available');
       }
 
-      final response = await query;
+      final response = await query.order('created_at', ascending: false);
+
       final equipmentList = response.map((map) {
-        return Equipment.fromMap(map);
+        // Flatten the nested structure for backward compatibility
+        final flatMap = Map<String, dynamic>.from(map);
+
+        // Extract category name from join or use the category field
+        if (map['equipment_categories'] != null &&
+            map['equipment_categories']['category_name'] != null) {
+          flatMap['categoryName'] = map['equipment_categories']['category_name'];
+        } else if (map['category'] != null) {
+          flatMap['categoryName'] = map['category'];
+        } else {
+          flatMap['categoryName'] = 'Unknown';
+        }
+
+        // Remove the nested object
+        flatMap.remove('equipment_categories');
+
+        return Equipment.fromMap(flatMap);
       }).toList();
 
       return equipmentList;
@@ -188,11 +215,17 @@ class _CatalogPageState extends State<CatalogPage>
             future: _categoriesFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const SizedBox(
+                  height: 60,
+                  child: Center(child: CircularProgressIndicator()),
+                );
               }
               if (snapshot.hasError) {
-                return Center(
-                  child: Text('Error loading categories: ${snapshot.error}'),
+                return SizedBox(
+                  height: 60,
+                  child: Center(
+                    child: Text('Error loading categories: ${snapshot.error}'),
+                  ),
                 );
               }
 
@@ -242,7 +275,30 @@ class _CatalogPageState extends State<CatalogPage>
                 }
                 if (snapshot.hasError) {
                   return Center(
-                    child: Text('Error: ${snapshot.error.toString()}'),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 60, color: Colors.red[300]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Error loading equipment',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Text(
+                            snapshot.error.toString(),
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(color: Colors.grey[500]),
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 }
 
@@ -404,17 +460,26 @@ class _CatalogPageState extends State<CatalogPage>
   }
 
   IconData _getIconForCategory(String categoryName) {
-    switch (categoryName) {
-      case 'Laptops':
+    switch (categoryName.toLowerCase()) {
+      case 'laptops':
         return Icons.laptop_mac;
-      case 'Projectors':
+      case 'projectors':
         return Icons.video_camera_front_outlined;
-      case 'HDMI Cables':
+      case 'hdmi cables':
+      case 'cables':
         return Icons.cable;
-      case 'Audio':
+      case 'audio':
+      case 'audio equipment':
         return Icons.headset_outlined;
-      case 'Tablets':
+      case 'tablets':
         return Icons.tablet_mac;
+      case 'monitors':
+        return Icons.monitor;
+      case 'keyboards':
+        return Icons.keyboard;
+      case 'mice':
+      case 'mouse':
+        return Icons.mouse;
       default:
         return Icons.inventory_2_outlined;
     }
@@ -536,7 +601,7 @@ class _CatalogPageState extends State<CatalogPage>
                   const SizedBox(height: 4),
                   Flexible(
                     child: Text(
-                      specsString,
+                      specsString.isNotEmpty ? specsString : equipment.brand ?? 'No details',
                       style: GoogleFonts.poppins(
                         color: Colors.grey[600],
                         fontSize: 12,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import '../services/admin_dashboard_service.dart';
 
 class RecentActivitiesWidget extends StatefulWidget {
@@ -59,34 +58,59 @@ class _RecentActivitiesWidgetState extends State<RecentActivitiesWidget> {
     );
   }
 
-  Widget _buildActivityItem(Map<String, dynamic> activity) {
-    final userName =
-        '${activity['user_profiles']['first_name']} ${activity['user_profiles']['last_name']}';
-    final equipmentName = activity['equipment']['name'];
-    final status = activity['status'];
-    final createdAt = DateTime.parse(activity['created_at']);
-    final timeAgo = _getTimeAgo(createdAt);
+ Widget _buildActivityItem(Map<String, dynamic> activity) {
+  final userName =
+      '${activity['user_profiles']['first_name']} ${activity['user_profiles']['last_name']}';
+  final equipmentName = activity['equipment']['name'];
+  final status = activity['status'];
+  final createdAt = DateTime.parse(activity['created_at']);
+  final timeAgo = _getTimeAgo(createdAt);
 
-    IconData icon;
-    Color iconColor;
-    String actionText;
+  IconData icon;
+  Color iconColor;
+  String actionText;
 
-    switch (status) {
-      case 'pending':
-        icon = Icons.pending;
-        iconColor = Colors.orange;
-        actionText = 'New borrow request from';
-        break;
-      case 'returned':
-        icon = Icons.assignment_return;
-        iconColor = Colors.green;
-        actionText = 'Equipment returned by';
-        break;
-      default:
-        icon = Icons.info;
-        iconColor = Colors.blue;
-        actionText = 'Request update from';
-    }
+  switch (status) {
+    case 'pending':
+      icon = Icons.pending;
+      iconColor = Colors.orange;
+      actionText = 'New borrow request from';
+      break;
+    case 'approved':
+      icon = Icons.check_circle;
+      iconColor = Colors.green;
+      actionText = 'Request approved for';
+      break;
+    case 'active':
+      icon = Icons.handshake;
+      iconColor = Colors.blue;
+      actionText = 'Equipment borrowed by';
+      break;
+    case 'overdue':
+      icon = Icons.warning_amber;
+      iconColor = Colors.red;
+      actionText = 'Overdue equipment from';
+      break;
+    case 'returned':
+      icon = Icons.assignment_return;
+      iconColor = Colors.green;
+      actionText = 'Equipment returned by';
+      break;
+    case 'cancelled':
+      icon = Icons.cancel;
+      iconColor = Colors.red;
+      actionText = 'Request cancelled by';
+      break;
+    case 'expired':
+      icon = Icons.schedule;
+      iconColor = Colors.orange;
+      actionText = 'Request expired from';
+      break;
+    default:
+      icon = Icons.info;
+      iconColor = Colors.grey;
+      actionText = 'Activity from';
+  }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

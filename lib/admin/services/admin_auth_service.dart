@@ -1,42 +1,64 @@
-import 'package:flutter/material.dart'; // Add this for debugPrint
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/material.dart';
 import '../../main.dart';
 
 class AdminAuthService {
-  static Future<bool> isAdmin() async {
+  // Cache the admin status
+  static bool? _cachedIsAdmin;
+  static String? _cachedUserId;
+
+  static Future<bool> isAdmin({bool forceRefresh = false}) async {
     final user = supabase.auth.currentUser;
 
-    // Add debugging
     debugPrint('=== ADMIN CHECK DEBUG ===');
     debugPrint('Current user: ${user?.email}');
     debugPrint('User ID: ${user?.id}');
 
     if (user == null) {
       debugPrint('No user found');
+      _cachedIsAdmin = null;
+      _cachedUserId = null;
       return false;
+    }
+
+    // Return cached value if available and user hasn't changed
+    if (!forceRefresh &&
+        _cachedIsAdmin != null &&
+        _cachedUserId == user.id) {
+      debugPrint('Returning cached admin status: $_cachedIsAdmin');
+      debugPrint('========================');
+      return _cachedIsAdmin!;
     }
 
     try {
       final profile = await supabase
           .from('user_profiles')
-          .select(
-            'role, email, first_name, last_name',
-          ) // Select more fields for debugging
+          .select('role')  // Only select what you need
           .eq('id', user.id)
           .single();
 
-      // Add more debugging
+      final isAdminUser = profile['role'] == 'admin';
+
+      // Cache the result
+      _cachedIsAdmin = isAdminUser;
+      _cachedUserId = user.id;
+
       debugPrint('Profile found: $profile');
       debugPrint('User role: ${profile['role']}');
-      debugPrint('Is admin: ${profile['role'] == 'admin'}');
+      debugPrint('Is admin: $isAdminUser');
       debugPrint('========================');
 
-      return profile['role'] == 'admin';
+      return isAdminUser;
     } catch (e) {
       debugPrint('Error checking admin status: $e');
       debugPrint('========================');
       return false;
     }
+  }
+
+  // Clear cache when user logs out
+  static void clearCache() {
+    _cachedIsAdmin = null;
+    _cachedUserId = null;
   }
 
   static Future<Map<String, dynamic>?> getAdminProfile() async {

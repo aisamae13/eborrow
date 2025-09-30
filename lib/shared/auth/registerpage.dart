@@ -75,30 +75,40 @@ class _RegisterPageState extends State<RegisterPage> {
     return null;
   }
 
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Password is required';
-    }
-
-    final List<String> errors = [];
-
-    if (value.length < 8) {
-      errors.add('At least 8 characters');
-    }
-    if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
-      errors.add('At least one lowercase letter');
-    }
-    if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
-      errors.add('At least one uppercase letter');
-    }
-    if (!RegExp(r'(?=.*\d)').hasMatch(value)) {
-      errors.add('At least one number');
-    }
-    if (errors.isNotEmpty) {
-      return 'Password must contain:\n\u2022 ${errors.join('\n\u2022 ')}';
-    }
-    return null;
+String? _validatePassword(String? value) {
+  if (value == null || value.isEmpty) {
+    return 'Password is required';
   }
+
+  final List<String> errors = [];
+
+  if (value.length < 8) {
+    errors.add('At least 8 characters');
+  }
+  if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
+    errors.add('At least one lowercase letter');
+  }
+  if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
+    errors.add('At least one uppercase letter');
+  }
+  if (!RegExp(r'(?=.*\d)').hasMatch(value)) {
+    errors.add('At least one number');
+  }
+  // ⭐️ ADDED: Check for an underscore symbol
+  if (!RegExp(r'(?=.*[_])').hasMatch(value)) {
+    errors.add('At least one underscore symbol (_)');
+  }
+  // 💡 Optional: If you meant any special character, use:
+  // if (!RegExp(r'(?=.*[\W_])').hasMatch(value)) {
+  //   errors.add('At least one special character');
+  // }
+
+
+  if (errors.isNotEmpty) {
+    return 'Password must contain:\n\u2022 ${errors.join('\n\u2022 ')}';
+  }
+  return null;
+}
 
   String? _validateConfirmPassword(String? value) {
     if (value == null || value.isEmpty) {

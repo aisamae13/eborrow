@@ -14,11 +14,51 @@ class RequestsManagementPage extends StatefulWidget {
 class _RequestsManagementPageState extends State<RequestsManagementPage>
     with TickerProviderStateMixin {
   late TabController _tabController;
+  Key _tabViewKey = UniqueKey();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    // CHANGED: Length is now 7 to include 'Overdue'
+    _tabController = TabController(length: 7, vsync: this);
+  }
+
+  // Forces a full rebuild of the TabBarView and switches to the correct tab.
+  void _refreshAllTabsAndSwitch({String? targetStatus}) {
+    setState(() {
+      // Force a rebuild of all tabs (reload data in RequestListTab)
+      _tabViewKey = UniqueKey();
+
+      // Switch to the appropriate tab based on target status
+      if (targetStatus != null) {
+        final targetIndex = _getTabIndexForStatus(targetStatus);
+        if (targetIndex != -1) {
+          _tabController.animateTo(targetIndex);
+        }
+      }
+    });
+  }
+
+  // Helper to get tab index from status
+  int _getTabIndexForStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 0;
+      case 'approved':
+        return 1;
+      case 'active':
+        return 2;
+      case 'overdue': // <--- ADDED
+        return 3;
+      case 'returned':
+        return 4; // Index shifted
+      case 'cancelled':
+        return 5; // Index shifted
+      case 'expired':
+        return 6; // Index shifted
+      default:
+        return -1;
+    }
   }
 
   @override
@@ -36,8 +76,8 @@ class _RequestsManagementPageState extends State<RequestsManagementPage>
         title: Text(
           'Borrowing Requests',
           style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontSize: 24,
+            fontWeight: FontWeight.w500,
             color: Colors.white,
           ),
         ),
@@ -53,6 +93,7 @@ class _RequestsManagementPageState extends State<RequestsManagementPage>
             Tab(text: 'Pending'),
             Tab(text: 'Approved'),
             Tab(text: 'Active'),
+            Tab(text: 'Overdue'), // <--- ADDED
             Tab(text: 'Returned'),
             Tab(text: 'Cancelled'),
             Tab(text: 'Expired'),
@@ -60,14 +101,23 @@ class _RequestsManagementPageState extends State<RequestsManagementPage>
         ),
       ),
       body: TabBarView(
+        key: _tabViewKey,
         controller: _tabController,
-        children: const [
-          RequestsTab(status: 'pending'),
-          RequestsTab(status: 'approved'),
-          RequestsTab(status: 'active'),
-          RequestsTab(status: 'returned'), // ✅ ADDED
-          RequestsTab(status: 'cancelled'), // ✅ ADDED
-          RequestsTab(status: 'expired'), // ✅ ADDED
+        children: [
+          RequestsTab(
+              status: 'pending', onGlobalAction: _refreshAllTabsAndSwitch),
+          RequestsTab(
+              status: 'approved', onGlobalAction: _refreshAllTabsAndSwitch),
+          RequestsTab(
+              status: 'active', onGlobalAction: _refreshAllTabsAndSwitch),
+          RequestsTab(
+              status: 'overdue', onGlobalAction: _refreshAllTabsAndSwitch), // <--- ADDED
+          RequestsTab(
+              status: 'returned', onGlobalAction: _refreshAllTabsAndSwitch),
+          RequestsTab(
+              status: 'cancelled', onGlobalAction: _refreshAllTabsAndSwitch),
+          RequestsTab(
+              status: 'expired', onGlobalAction: _refreshAllTabsAndSwitch),
         ],
       ),
     );
@@ -76,15 +126,21 @@ class _RequestsManagementPageState extends State<RequestsManagementPage>
 
 class RequestsTab extends StatefulWidget {
   final String status;
+  final void Function({String? targetStatus}) onGlobalAction;
 
-  const RequestsTab({super.key, required this.status});
+  const RequestsTab(
+      {super.key, required this.status, required this.onGlobalAction});
 
   @override
   State<RequestsTab> createState() => _RequestsTabState();
 }
 
-class _RequestsTabState extends State<RequestsTab> {
+class _RequestsTabState extends State<RequestsTab> with AutomaticKeepAliveClientMixin {
   late Future<List<Map<String, dynamic>>> _requestsFuture;
+  final GlobalKey<RefreshIndicatorState> _refreshKey = GlobalKey<RefreshIndicatorState>();
+
+  @override
+  bool get wantKeepAlive => false; // Don't keep state alive to force refresh
 
   @override
   void initState() {
@@ -100,11 +156,21 @@ class _RequestsTabState extends State<RequestsTab> {
     });
   }
 
+  // Auto-trigger refresh after any action
+  Future<void> _refreshRequests() async {
+    await Future.delayed(const Duration(milliseconds: 300)); // Small delay for backend to process
+    _loadRequests();
+  }
+
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+
     return RefreshIndicator(
+      key: _refreshKey,
       onRefresh: () async {
         _loadRequests();
+        await _requestsFuture; // Wait for the future to complete
       },
       child: FutureBuilder<List<Map<String, dynamic>>>(
         future: _requestsFuture,
@@ -121,6 +187,13 @@ class _RequestsTabState extends State<RequestsTab> {
                   Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text('Error loading requests', style: GoogleFonts.poppins()),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${snapshot.error}',
+                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
                   TextButton(
                     onPressed: _loadRequests,
                     child: const Text('Retry'),
@@ -133,42 +206,52 @@ class _RequestsTabState extends State<RequestsTab> {
           final requests = snapshot.data ?? [];
 
           if (requests.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _getStatusIcon(widget.status),
-                    size: 80,
-                    color: Colors.grey[400],
-                  ), // ✅ FIXED
-                  const SizedBox(height: 16),
-                  Text(
-                    'No ${widget.status.toLowerCase()} requests',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[600],
+            return ListView( // Wrap in ListView so pull-to-refresh works
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.6,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _getStatusIcon(widget.status),
+                          size: 80,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No ${widget.status.toLowerCase()} requests',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _getEmptyStateMessage(widget.status),
+                          style: GoogleFonts.poppins(color: Colors.grey[500]),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _getEmptyStateMessage(widget.status), // ✅ FIXED
-                    style: GoogleFonts.poppins(color: Colors.grey[500]),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+                ),
+              ],
             );
           }
 
           return ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(), // Enable pull-to-refresh
             padding: const EdgeInsets.all(16),
             itemCount: requests.length,
             itemBuilder: (context, index) {
               return RequestCard(
                 request: requests[index],
-                onAction: _loadRequests,
+                onAction: widget.onGlobalAction,
+                onLocalRefresh: _refreshRequests, // Pass refresh callback
               );
             },
           );
@@ -176,8 +259,6 @@ class _RequestsTabState extends State<RequestsTab> {
       ),
     );
   }
-
-  // ✅ FIXED: Now being used in the build method
   IconData _getStatusIcon(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -186,6 +267,8 @@ class _RequestsTabState extends State<RequestsTab> {
         return Icons.check_circle;
       case 'active':
         return Icons.handshake;
+      case 'overdue': // <--- ADDED
+        return Icons.warning_amber;
       case 'returned':
         return Icons.assignment_return;
       case 'cancelled':
@@ -197,7 +280,6 @@ class _RequestsTabState extends State<RequestsTab> {
     }
   }
 
-  // ✅ FIXED: Now being used in the build method
   String _getEmptyStateMessage(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -205,7 +287,9 @@ class _RequestsTabState extends State<RequestsTab> {
       case 'approved':
         return 'Approved requests ready for pickup';
       case 'active':
-        return 'Currently borrowed equipment';
+        return 'Currently borrowed equipment, on time';
+      case 'overdue': // <--- ADDED
+        return 'Urgent: These items are past their return date!';
       case 'returned':
         return 'Successfully returned equipment';
       case 'cancelled':
@@ -220,9 +304,15 @@ class _RequestsTabState extends State<RequestsTab> {
 
 class RequestCard extends StatelessWidget {
   final Map<String, dynamic> request;
-  final VoidCallback onAction;
+  final void Function({String? targetStatus}) onAction;
+  final VoidCallback onLocalRefresh; // Add this
 
-  const RequestCard({super.key, required this.request, required this.onAction});
+  const RequestCard({
+    super.key,
+    required this.request,
+    required this.onAction,
+    required this.onLocalRefresh, // Add this
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -231,7 +321,7 @@ class RequestCard extends StatelessWidget {
 
     final userName =
         '${userProfiles['first_name'] ?? 'Unknown'} ${userProfiles['last_name'] ?? 'User'}'
-            .trim(); // ✅ Added .trim()
+            .trim();
     final studentId = userProfiles['student_id'] ?? 'N/A';
     final equipmentName = equipment['name'] ?? 'Unknown Equipment';
     final equipmentBrand = equipment['brand'] ?? '';
@@ -249,10 +339,8 @@ class RequestCard extends StatelessWidget {
     final dateFormatter = DateFormat('MMM dd, yyyy');
     final timeFormatter = DateFormat('hh:mm a');
 
-    // Determine if overdue (for active items)
-    final isOverdue = status == 'active' && DateTime.now().isAfter(returnDate);
+    // REMOVED: final isOverdue = status == 'active' && DateTime.now().isAfter(returnDate);
 
-    // Get status color and badge
     Color statusColor;
     String statusBadge;
 
@@ -266,8 +354,12 @@ class RequestCard extends StatelessWidget {
         statusBadge = 'Approved';
         break;
       case 'active':
-        statusColor = isOverdue ? Colors.red : Colors.blue;
-        statusBadge = isOverdue ? 'Overdue' : 'Active';
+        statusColor = Colors.blue;
+        statusBadge = 'Active';
+        break;
+      case 'overdue': // <--- ADDED
+        statusColor = Colors.red;
+        statusBadge = 'Overdue';
         break;
       case 'returned':
         statusColor = Colors.green;
@@ -286,9 +378,10 @@ class RequestCard extends StatelessWidget {
         statusBadge = status.toUpperCase();
     }
 
-    // ✅ FIXED: Safe way to get user initials
+    final isCurrentOverdue = status.toLowerCase() == 'overdue'; // <--- SIMPLIFIED
+
     String getUserInitials(String name) {
-      if (name.isEmpty) return 'U'; // Default to 'U' for User
+      if (name.isEmpty) return 'U';
 
       final parts = name
           .trim()
@@ -308,9 +401,10 @@ class RequestCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isOverdue ? Colors.red.withOpacity(0.05) : Colors.white,
+        // CHANGED: Use simplified check for coloring the background
+        color: isCurrentOverdue ? Colors.red.withOpacity(0.05) : Colors.white,
         borderRadius: BorderRadius.circular(15),
-        border: isOverdue
+        border: isCurrentOverdue // CHANGED: Use simplified check for border
             ? Border.all(color: Colors.red.withOpacity(0.3))
             : null,
         boxShadow: [
@@ -325,14 +419,13 @@ class RequestCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: User info and status
           Row(
             children: [
               CircleAvatar(
                 radius: 20,
                 backgroundColor: statusColor.withOpacity(0.1),
                 child: Text(
-                  getUserInitials(userName), // ✅ FIXED: Use safe method
+                  getUserInitials(userName),
                   style: GoogleFonts.poppins(
                     color: statusColor,
                     fontWeight: FontWeight.bold,
@@ -346,9 +439,7 @@ class RequestCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      userName.isNotEmpty
-                          ? userName
-                          : 'Unknown User', // ✅ FIXED: Handle empty names
+                      userName.isNotEmpty ? userName : 'Unknown User',
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -384,11 +475,7 @@ class RequestCard extends StatelessWidget {
               ),
             ],
           ),
-
-          // ... rest of your existing code stays the same
           const SizedBox(height: 16),
-
-          // Equipment info
           Row(
             children: [
               Container(
@@ -428,10 +515,7 @@ class RequestCard extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          // Date info
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -471,11 +555,12 @@ class RequestCard extends StatelessWidget {
                       ),
                     ),
                     Text(
+                      // CHANGED: Use simplified check for return date color
                       '${dateFormatter.format(returnDate)} ${timeFormatter.format(returnDate)}',
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w500,
                         fontSize: 12,
-                        color: isOverdue ? Colors.red : Colors.black,
+                        color: isCurrentOverdue ? Colors.red : Colors.black,
                       ),
                     ),
                   ],
@@ -483,8 +568,6 @@ class RequestCard extends StatelessWidget {
               ],
             ),
           ),
-
-          // Purpose
           if (purpose.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
@@ -500,10 +583,7 @@ class RequestCard extends StatelessWidget {
               ),
             ),
           ],
-
           const SizedBox(height: 16),
-
-          // Action buttons
           _buildActionButtons(
             context,
             status,
@@ -517,188 +597,273 @@ class RequestCard extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButtons(
-    BuildContext context,
-    String status,
-    int requestId,
-    String borrowerId,
-    String equipmentName,
-    int equipmentId,
-  ) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _showRejectDialog(
-                  context,
-                  requestId,
-                  borrowerId,
-                  equipmentName,
-                ),
-                icon: const Icon(Icons.close, size: 16),
-                label: const Text('Reject'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                ),
+ Widget _buildActionButtons(
+  BuildContext context,
+  String status,
+  int requestId,
+  String borrowerId,
+  String equipmentName,
+  int equipmentId,
+) {
+  switch (status.toLowerCase()) {
+    case 'pending':
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => _showRejectDialog(
+                context,
+                requestId,
+                borrowerId,
+                equipmentName,
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () => _approveRequest(
-                  context,
-                  requestId,
-                  borrowerId,
-                  equipmentName,
-                ),
-                icon: const Icon(Icons.check, size: 16),
-                label: const Text('Approve'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+                padding: const EdgeInsets.symmetric(vertical: 8),
               ),
+              child: const Text('Reject', style: TextStyle(fontSize: 12)),
             ),
-          ],
-        );
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => _approveRequest(
+                context,
+                requestId,
+                borrowerId,
+                equipmentName,
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+              child: const Text('Approve', style: TextStyle(fontSize: 12)),
+            ),
+          ),
+        ],
+      );
 
-      case 'returned':
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
+    case 'approved':
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () => _handOutEquipment(context, requestId, equipmentId),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2B326B),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+          ),
+          child: const Text('Hand Out Equipment', style: TextStyle(fontSize: 12)),
+        ),
+      );
+
+    case 'active': // Standard, non-overdue borrowing period
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 16),
-              const SizedBox(width: 8),
-              Text(
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _sendReminder(
+                    context,
+                    requestId,
+                    borrowerId,
+                    equipmentName,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange, // Standard reminder color
+                    side: const BorderSide(color: Colors.orange),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                  ),
+                  child: const Text('Remind', style: TextStyle(fontSize: 11)),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _showExtendDialog(context, requestId),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.blue, // Standard extension color
+                    side: const BorderSide(color: Colors.blue),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                  ),
+                  child: const Text('Extend', style: TextStyle(fontSize: 11)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => _markAsReturned(context, requestId, equipmentId),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+              child: const Text('Mark Returned', style: TextStyle(fontSize: 12)),
+            ),
+          ),
+        ],
+      );
+
+    case 'overdue': // 🟢 NEW: Critical status requiring urgent action
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Highlight text to show item is overdue
+          Text(
+            'Action Required: Item is Overdue',
+            style: GoogleFonts.poppins(
+              color: Colors.red,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _sendReminder(
+                    context,
+                    requestId,
+                    borrowerId,
+                    equipmentName,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red, // URGENT: Red for overdue follow-up
+                    side: const BorderSide(color: Colors.red),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                  ),
+                  child: const Text('Remind', style: TextStyle(fontSize: 11)),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _showExtendDialog(context, requestId),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange, // Slightly less urgent, but modification is possible
+                    side: const BorderSide(color: Colors.orange),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                  ),
+                  child: const Text('Extend', style: TextStyle(fontSize: 11)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => _markAsReturned(context, requestId, equipmentId),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green, // Final positive action
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+              child: const Text('Mark Returned', style: TextStyle(fontSize: 12)),
+            ),
+          ),
+        ],
+      );
+
+    // Existing cases below remain the same
+    case 'returned':
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 16),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
                 'Successfully returned',
                 style: GoogleFonts.poppins(
                   color: Colors.green,
                   fontWeight: FontWeight.w500,
+                  fontSize: 12,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
-            ],
-          ),
-        );
+            ),
+          ],
+        ),
+      );
 
-      case 'cancelled':
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              Icon(Icons.cancel, color: Colors.red, size: 16),
-              const SizedBox(width: 8),
-              Text(
+    case 'cancelled':
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cancel, color: Colors.red, size: 16),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
                 'Cancelled by user',
                 style: GoogleFonts.poppins(
                   color: Colors.red,
                   fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+
+    case 'expired':
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.schedule, color: Colors.orange, size: 16),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Request expired',
+                  style: GoogleFonts.poppins(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-        );
-
-      case 'expired':
-        return Row(
-          children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    Icon(Icons.schedule, color: Colors.orange, size: 16),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Request expired',
-                      style: GoogleFonts.poppins(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            OutlinedButton.icon(
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
               onPressed: () => _reactivateExpiredRequest(context, requestId),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('Reactivate'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.blue,
                 side: const BorderSide(color: Colors.blue),
+                padding: const EdgeInsets.symmetric(vertical: 8),
               ),
-            ),
-          ],
-        );
-
-      case 'approved':
-        return SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => _handOutEquipment(context, requestId, equipmentId),
-            icon: const Icon(Icons.handshake, size: 16),
-            label: const Text('Hand Out Equipment'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2B326B),
-              foregroundColor: Colors.white,
+              child: const Text('Reactivate', style: TextStyle(fontSize: 12)),
             ),
           ),
-        );
+        ],
+      );
 
-      case 'active':
-        return Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _sendReminder(
-                  context,
-                  requestId,
-                  borrowerId,
-                  equipmentName,
-                ),
-                icon: const Icon(Icons.notifications, size: 16),
-                label: const Text('Send Reminder'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.orange,
-                  side: const BorderSide(color: Colors.orange),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _showExtendDialog(context, requestId),
-                icon: const Icon(Icons.schedule, size: 16),
-                label: const Text('Extend'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.blue,
-                  side: const BorderSide(color: Colors.blue),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () =>
-                    _markAsReturned(context, requestId, equipmentId),
-                icon: const Icon(Icons.assignment_return, size: 16),
-                label: const Text('Mark Returned'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        );
-
-      default:
-        return const SizedBox.shrink();
-    }
+    default:
+      return const SizedBox.shrink();
   }
+}
 
   IconData _getEquipmentIcon(String equipmentName) {
     final name = equipmentName.toLowerCase();
@@ -718,39 +883,41 @@ class RequestCard extends StatelessWidget {
     return Icons.inventory_2;
   }
 
+  // FIX 1: Approve Request (Pending -> Approved)
   void _approveRequest(
-    BuildContext context,
-    int requestId,
-    String borrowerId,
-    String equipmentName,
-  ) async {
-    try {
-      await RequestManagementService.approveRequest(
-        requestId,
-        borrowerId,
-        equipmentName,
+  BuildContext context,
+  int requestId,
+  String borrowerId,
+  String equipmentName,
+) async {
+  try {
+    await RequestManagementService.approveRequest(
+      requestId,
+      borrowerId,
+      equipmentName,
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Request approved successfully!'),
+          backgroundColor: Colors.green,
+        ),
       );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Request approved successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        onAction(); // Refresh the list
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error approving request: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      onLocalRefresh(); // Refresh current tab first
+      await Future.delayed(const Duration(milliseconds: 100));
+      onAction(targetStatus: 'approved'); // Then switch tabs
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error approving request: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
-
+}
   void _showRejectDialog(
     BuildContext context,
     int requestId,
@@ -802,7 +969,9 @@ class RequestCard extends StatelessWidget {
                       backgroundColor: Colors.red,
                     ),
                   );
-                  onAction();
+                  onLocalRefresh(); // Refresh current tab first
+                  await Future.delayed(const Duration(milliseconds: 100));
+                  onAction(targetStatus: 'cancelled'); // Stay on Pending tab, forces refresh
                 }
               } catch (e) {
                 if (context.mounted) {
@@ -823,6 +992,7 @@ class RequestCard extends StatelessWidget {
     );
   }
 
+  // FIX 2: Hand Out Equipment (Approved -> Active)
   void _handOutEquipment(
     BuildContext context,
     int requestId,
@@ -837,7 +1007,10 @@ class RequestCard extends StatelessWidget {
             backgroundColor: Colors.blue,
           ),
         );
-        onAction();
+        // ✅ CORRECT: Request is now 'active', navigate to Active tab
+        onLocalRefresh(); // Refresh current tab first
+      await Future.delayed(const Duration(milliseconds: 100));
+        onAction(targetStatus: 'active');
       }
     } catch (e) {
       if (context.mounted) {
@@ -851,6 +1024,7 @@ class RequestCard extends StatelessWidget {
     }
   }
 
+  // FIX 3: Mark as Returned (Active -> Returned)
   void _markAsReturned(
     BuildContext context,
     int requestId,
@@ -885,7 +1059,10 @@ class RequestCard extends StatelessWidget {
               backgroundColor: Colors.green,
             ),
           );
-          onAction();
+          // ✅ CORRECT: Request is now 'returned', navigate to Returned tab
+          onLocalRefresh(); // Refresh current tab first
+      await Future.delayed(const Duration(milliseconds: 100));
+          onAction(targetStatus: 'returned');
         }
       } catch (e) {
         if (context.mounted) {
@@ -932,6 +1109,7 @@ class RequestCard extends StatelessWidget {
     }
   }
 
+  // FIX 4: Reactivate Expired Request (Expired -> Pending)
   void _reactivateExpiredRequest(BuildContext context, int requestId) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -971,7 +1149,10 @@ class RequestCard extends StatelessWidget {
               backgroundColor: Colors.blue,
             ),
           );
-          onAction();
+          // ✅ CORRECT: Request is now 'pending', navigate to Pending tab
+          onLocalRefresh(); // Refresh current tab first
+      await Future.delayed(const Duration(milliseconds: 100));
+          onAction(targetStatus: 'pending');
         }
       } catch (e) {
         if (context.mounted) {
@@ -1044,7 +1225,9 @@ class RequestCard extends StatelessWidget {
                         backgroundColor: Colors.blue,
                       ),
                     );
-                    onAction();
+                    onLocalRefresh(); // Refresh current tab first
+      await Future.delayed(const Duration(milliseconds: 100));
+                    onAction(targetStatus: 'active'); // Stay on Active tab
                   }
                 } catch (e) {
                   if (context.mounted) {

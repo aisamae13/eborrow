@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../widgets/stats_card.dart';
-import '../widgets/quick_actions_card.dart';
 import '../widgets/recent_activities_widget.dart';
 import '../services/admin_dashboard_service.dart';
+import 'package:provider/provider.dart';
+import '../../shared/notifications/notification_page.dart';
+import '../../shared/notifications/notification_with_badge.dart';
+import '../../shared/notifications/notification_service.dart';
+import '../../main.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -19,8 +22,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void initState() {
     super.initState();
     _dashboardData = AdminDashboardService.getDashboardData();
+     _initializeNotifications();
   }
-
+void _initializeNotifications() { // ADD THIS ENTIRE METHOD
+  final user = supabase.auth.currentUser;
+  if (user != null) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NotificationProvider>().initializeRealtime(user.id);
+    });
+  }
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,23 +44,31 @@ class _AdminDashboardState extends State<AdminDashboard> {
             Text(
               'IT Admin',
               style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontSize: 24,
+                fontWeight: FontWeight.w500,
                 color: Colors.white,
               ),
             ),
           ],
         ),
         backgroundColor: const Color(0xFF2B326B),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications, color: Colors.white),
-            onPressed: () {
-              // Navigate to admin notifications
+       actions: [
+          RealtimeNotificationBadge(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NotificationPage(),
+                ),
+              );
             },
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(4.0),
+          child: Container(color: const Color(0xFFFFC107), height: 4.0),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -140,7 +159,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             'Welcome, Admin!',
             style: GoogleFonts.poppins(
               fontSize: 24,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w500,
               color: const Color(0xFFFFC107),
             ),
           ),
@@ -272,7 +291,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(12), // 🔧 REDUCED from 16 to 12
+      padding: const EdgeInsets.all(5), // 🔧 REDUCED from 16 to 12
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),

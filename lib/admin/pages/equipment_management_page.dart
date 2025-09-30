@@ -61,8 +61,8 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
         title: Text(
           'Equipment Management',
           style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontSize: 24,
+            fontWeight: FontWeight.w500,
             color: Colors.white,
           ),
         ),

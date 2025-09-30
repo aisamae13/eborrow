@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'registerpage.dart';
 import 'forgotpasswordpage.dart';
 import '../../navigation/bottom_nav.dart';
+import '../../admin/services/admin_auth_service.dart';
+import '../../admin/widgets/admin_bottom_nav.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
 import 'dart:async';
@@ -30,37 +33,83 @@ class _LoginPageState extends State<LoginPage> {
   void initState() {
     super.initState();
     _setupAuthListener();
+    _checkRememberMe();
   }
 
-  void _setupAuthListener() {
-    // Listen for authentication state changes
-    _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
-      final AuthChangeEvent event = data.event;
-      final Session? session = data.session;
+void _setupAuthListener() {
+  _authSubscription = supabase.auth.onAuthStateChange.listen((data) async {
+    final AuthChangeEvent event = data.event;
+    final Session? session = data.session;
 
-      if (event == AuthChangeEvent.signedIn && session != null && mounted) {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Login successful!'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+    print('Auth event: $event');
+    print('Has session: ${session != null}');
 
-        // Add a small delay to show the success message before navigation
-        Timer(const Duration(milliseconds: 500), () {
+    if (event == AuthChangeEvent.signedIn && session != null && mounted) {
+      try {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (mounted) {
-            // User successfully signed in, navigate to home
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => const BottomNav()),
-              (route) => false,
-            );
+            // Check if user is admin
+            final isAdminUser = await AdminAuthService.isAdmin();
+
+            if (mounted) {
+              if (isAdminUser) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const AdminBottomNav()),
+                  (route) => false,
+                );
+              } else {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const BottomNav()),
+                  (route) => false,
+                );
+              }
+            }
           }
         });
+      } catch (e) {
+        print('Error in auth listener: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Authentication error: ${e.toString()}',
+                style: GoogleFonts.poppins(),
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       }
-    });
-  }
+    }
+  }, onError: (error) {
+    // Catch auth stream errors (including trigger errors)
+    print('Auth stream error: $error');
+    if (mounted) {
+      String errorMessage = 'Authentication failed.';
+
+      if (error.toString().contains('Database error') ||
+          error.toString().contains('suspended')) {
+        errorMessage = 'Your account has been suspended. Please contact the administrator.';
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            errorMessage,
+            style: GoogleFonts.poppins(),
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  });
+}
 
   @override
   void dispose() {
@@ -71,49 +120,148 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Future<void> _signIn() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+Future<void> _checkRememberMe() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberMe = prefs.getBool('remember_me') ?? false;
 
     setState(() {
-      _isLoading = true;
+      _rememberMe = rememberMe;
     });
 
-    try {
-      await supabase.auth.signInWithPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+    // If remember me is enabled and user has a session, navigate automatically
+    if (rememberMe && supabase.auth.currentUser != null) {
+      if (mounted) {
+        final isAdminUser = await AdminAuthService.isAdmin();
+
+        if (mounted) {
+          if (isAdminUser) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const AdminBottomNav()),
+            );
+          } else {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const BottomNav()),
+            );
+          }
+        }
+      }
+    }
+  }
+
+Future<void> _signIn() async {
+  if (!_formKey.currentState!.validate()) {
+    return;
+  }
+
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    // Save remember me preference
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('remember_me', _rememberMe);
+
+    await supabase.auth.signInWithPassword(
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+    );
+
+    if (mounted) {
+      // Check if user is admin
+      final isAdminUser = await AdminAuthService.isAdmin();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Login successful!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 1),
+        ),
       );
 
-      // The success message and navigation will be handled by the auth listener
-      // No need to navigate here since the auth listener will handle it
-    } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+      // Route based on role
+      if (isAdminUser) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const AdminBottomNav()),
+          (route) => false,
         );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('An unexpected error occurred.'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+      } else {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const BottomNav()),
+          (route) => false,
         );
       }
     }
+  } on AuthException catch (e) {
+    // Log the full error for debugging
+    print('AuthException: ${e.message}');
+    print('AuthException statusCode: ${e.statusCode}');
 
+    if (mounted) {
+      String errorMessage = e.message;
+
+      if (e.message.toLowerCase().contains('suspended')) {
+        errorMessage = 'Your account has been suspended. Please contact the administrator.';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  } on PostgrestException catch (e) {
+    // Catch Postgrest errors (database errors)
+    print('PostgrestException: ${e.message}');
+    print('PostgrestException code: ${e.code}');
+
+    if (mounted) {
+      String errorMessage = 'An error occurred during login.';
+
+      if (e.message.toLowerCase().contains('suspended')) {
+        errorMessage = 'Your account has been suspended. Please contact the administrator.';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  } catch (e) {
+    // Log the full error
+    print('General Exception: ${e.toString()}');
+    print('Exception type: ${e.runtimeType}');
+
+    if (mounted) {
+      String errorMessage = 'An unexpected error occurred.';
+
+      if (e.toString().toLowerCase().contains('suspended')) {
+        errorMessage = 'Your account has been suspended. Please contact the administrator.';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  } finally {
+    // Always stop loading, even if there's an error
     if (mounted) {
       setState(() {
         _isLoading = false;
       });
     }
   }
+}
+
 
   Future<void> _googleSignIn() async {
     setState(() {
@@ -377,7 +525,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           )
                         : Text(
-                            'Sign In',
+                            'Login',
                             style: GoogleFonts.poppins(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
