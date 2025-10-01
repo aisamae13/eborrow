@@ -492,12 +492,32 @@ Widget _buildEquipmentCard(Equipment equipment) {
     // ➡️ MODIFIED: Add checks for all relevant statuses
     final statusLower = equipment.status.toLowerCase();
     final isAvailable = statusLower == 'available';
-    final isInMaintenance = statusLower == 'maintenance'; // ADDED
-    final isRetired = statusLower == 'retired'; // ADDED
+    final isInMaintenance = statusLower == 'maintenance';
+    final isRetired = statusLower == 'retired';
 
-    // ➡️ MODIFIED: Determine the label and color based on status
     Color statusColor;
     String statusLabel;
+
+  const List<String> prioritySpecs = [
+    'RAM', 'Storage', 'Resolution', 'Processor', 'Technology', 'Model'
+  ];
+
+  String specsString = prioritySpecs
+      .map((key) => equipment.specifications[key])
+      .where((s) => s != null && (s as String).isNotEmpty)
+      .join(', ');
+
+  if (specsString.isEmpty && equipment.specifications.isNotEmpty) {
+    String firstKey = equipment.specifications.keys.first;
+    String? firstValue = equipment.specifications[firstKey];
+
+    if (firstValue != null && firstValue.isNotEmpty) {
+      specsString = '$firstKey: $firstValue';
+    }
+  }
+
+  final detailsText = specsString.isNotEmpty ? specsString : equipment.brand ?? 'No details';
+
 
     if (isAvailable) {
       statusColor = Colors.green;
@@ -514,14 +534,6 @@ Widget _buildEquipmentCard(Equipment equipment) {
     }
 
     final fallbackIcon = _getIconForCategory(equipment.categoryName);
-
-    String specsString = [
-      equipment.specifications['RAM'],
-      equipment.specifications['Storage'],
-      equipment.specifications['Resolution'],
-      equipment.specifications['Length'],
-      equipment.specifications['Technology'],
-    ].where((s) => s != null).join(', ');
 
     return Container(
       decoration: BoxDecoration(
@@ -627,7 +639,7 @@ Widget _buildEquipmentCard(Equipment equipment) {
                   const SizedBox(height: 4),
                   Flexible(
                     child: Text(
-                      specsString.isNotEmpty ? specsString : equipment.brand ?? 'No details',
+                       detailsText,
                       style: GoogleFonts.poppins(
                         color: Colors.grey[600],
                         fontSize: 12,
