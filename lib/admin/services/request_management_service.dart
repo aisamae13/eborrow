@@ -220,14 +220,12 @@ static String _formatDate(DateTime date) {
   static Future<void> markAsReturned(int requestId, int equipmentId) async {
     try {
       // Get borrower info first (needed for the DB trigger's message)
-      final request = await supabase
+      await supabase
           .from('borrow_requests')
           .select('borrower_id, equipment(name)')
           .eq('request_id', requestId)
           .single();
 
-      final borrowerId = request['borrower_id'];
-      final equipmentName = request['equipment']['name'];
 
       // ✅ FIX: Update request status. The DB trigger handles ALL notifications.
       await supabase
@@ -261,8 +259,7 @@ static String _formatDate(DateTime date) {
           .eq('request_id', requestId)
           .single();
 
-      final borrowerId = request['borrower_id'];
-      final equipmentName = request['equipment']['name'];
+      final _ = request['borrower_id'];
 
       // ✅ FIX: Update request status to active. The DB trigger handles ALL notifications.
       await supabase
@@ -280,38 +277,6 @@ static String _formatDate(DateTime date) {
 
     } catch (e) {
       throw Exception('Failed to hand out equipment: $e');
-    }
-  }
-
-  // Helper method to notify all admins
-  // ⚠️ NOTE: This helper is now only used for `approveRequest`, `markAsReturned`,
-  // and `handOutEquipment` in the *old* logic. Since we removed all calls to it
-  // in those functions, this helper is now completely unused and can be deleted
-  // from your final production code if you confirm no other files call it.
-  static Future<void> _notifyAllAdmins({
-    required String title,
-    required String message,
-    required NotificationType type,
-  }) async {
-    try {
-      // Get all admin user IDs
-      final admins = await supabase
-          .from('user_profiles')
-          .select('id')
-          .eq('role', 'admin');
-
-      // Send notification to each admin
-      for (final admin in admins) {
-        await NotificationService.createNotification(
-          userId: admin['id'],
-          title: title,
-          message: message,
-          type: type,
-        );
-      }
-    } catch (e) {
-      print('Error notifying admins: $e');
-      // Don't throw error - admin notifications failing shouldn't break the main operation
     }
   }
 }

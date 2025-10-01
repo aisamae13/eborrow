@@ -31,7 +31,7 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Align(
+                const Align(
                   alignment: Alignment.center,
                   child: Icon(
                     Icons.report_problem_outlined,
@@ -139,7 +139,50 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isAvailable = widget.equipment.status.toLowerCase() == 'available';
+    // --- 🚀 NEW STATUS LOGIC ---
+    final statusLower = widget.equipment.status.toLowerCase();
+    final isAvailable = statusLower == 'available';
+    final isMaintenance = statusLower == 'maintenance';
+    final isRetired = statusLower == 'retired';
+    final isUnavailable = !isAvailable;
+
+    // Determine colors and message based on status
+    Color statusBgColor;
+    Color statusFgColor;
+    String statusMessage;
+
+    if (isAvailable) {
+      statusBgColor = Colors.green[100]!;
+      statusFgColor = Colors.green[800]!;
+      statusMessage = '';
+    } else if (isMaintenance) {
+      statusBgColor = Colors.orange[100]!;
+      statusFgColor = Colors.orange[800]!;
+      statusMessage = 'This item is currently **In Maintenance** and cannot be borrowed.';
+    } else if (isRetired) {
+      statusBgColor = Colors.grey[300]!;
+      statusFgColor = Colors.grey[800]!; // Dark gray for retired
+      statusMessage = 'This item has been **Retired** and is permanently unavailable.';
+    } else {
+      // Default to Borrowed for all other unavailable statuses
+      statusBgColor = Colors.red[100]!;
+      statusFgColor = Colors.red[800]!;
+      statusMessage = 'This item is currently **Borrowed** and is unavailable.';
+    }
+
+    // Define the action for the button's onPressed property
+    VoidCallback? onPressedAction = isAvailable
+        ? () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    BorrowRequestPage(equipment: widget.equipment),
+              ),
+            );
+          }
+        : null; // Null disables the button
+    // --- END NEW STATUS LOGIC ---
 
     return Scaffold(
       appBar: AppBar(
@@ -185,26 +228,26 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // --- 🚀 UPDATED STATUS BADGE DISPLAY ---
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: isAvailable ? Colors.green[100] : Colors.red[100],
+                      color: statusBgColor, // Use calculated color
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       widget.equipment.status.toUpperCase(),
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.bold,
-                        color: isAvailable
-                            ? Colors.green[800]
-                            : Colors.red[800],
+                        color: statusFgColor, // Use calculated color
                         letterSpacing: 1,
                       ),
                     ),
                   ),
+                  // --- END UPDATED STATUS BADGE DISPLAY ---
                   const SizedBox(height: 16),
                   Text(
                     widget.equipment.name,
@@ -240,38 +283,50 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
           ],
         ),
       ),
+      // --- 🚀 UPDATED BOTTOM NAVIGATION BAR ---
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-        child: ElevatedButton(
-          // The button now only navigates to the next page
-          onPressed: isAvailable
-              ? () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          BorrowRequestPage(equipment: widget.equipment),
-                    ),
-                  );
-                }
-              : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2B326B),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (isUnavailable)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Text(
+                  statusMessage.replaceAll('**', ''), // Display message without markdown
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ElevatedButton(
+              onPressed: onPressedAction, // Null disables the button when unavailable
+              style: ElevatedButton.styleFrom(
+                // Use a light gray color when disabled for better UX
+                backgroundColor: isAvailable
+                    ? const Color(0xFF2B326B)
+                    : Colors.grey[400],
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+              ),
+              child: Text(
+                isAvailable ? 'Request to Borrow' : 'Not Available', // Text changes when disabled
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isAvailable ? Colors.white : Colors.grey[700],
+                ),
+              ),
             ),
-          ),
-          child: Text(
-            isAvailable ? 'Request to Borrow' : 'Currently Borrowed',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
+          ],
         ),
       ),
+      // --- END UPDATED BOTTOM NAVIGATION BAR ---
     );
   }
 

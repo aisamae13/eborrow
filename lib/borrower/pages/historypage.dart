@@ -143,12 +143,6 @@ class _HistoryPageState extends State<HistoryPage>
     );
 
     if (confirm == true) {
-      // Define the Admin's ID
-      const String adminUserId = '33e2d8dd-bbc6-4bc5-8347-d8dcf2981420';
-
-      // Get borrower's name for the admin notification
-      final currentUserName = supabase.auth.currentUser?.email?.split('@').first ?? 'A Borrower';
-
       try {
         // 1. Notify the BORROWER (Self-Notification for UX)
         await NotificationService.createNotification(

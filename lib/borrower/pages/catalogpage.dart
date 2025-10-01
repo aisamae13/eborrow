@@ -74,6 +74,8 @@ class _CatalogPageState extends State<CatalogPage>
           .from('equipment')
           .select('*, equipment_categories(category_name)');
 
+      query = query.neq('status', 'retired');
+
       if (_searchQuery.isNotEmpty) {
         query = query.or(
           'name.ilike.%$_searchQuery%,brand.ilike.%$_searchQuery%,model.ilike.%$_searchQuery%',
@@ -485,8 +487,32 @@ class _CatalogPageState extends State<CatalogPage>
     }
   }
 
-  Widget _buildEquipmentCard(Equipment equipment) {
-    final isAvailable = equipment.status.toLowerCase() == 'available';
+
+Widget _buildEquipmentCard(Equipment equipment) {
+    // ➡️ MODIFIED: Add checks for all relevant statuses
+    final statusLower = equipment.status.toLowerCase();
+    final isAvailable = statusLower == 'available';
+    final isInMaintenance = statusLower == 'maintenance'; // ADDED
+    final isRetired = statusLower == 'retired'; // ADDED
+
+    // ➡️ MODIFIED: Determine the label and color based on status
+    Color statusColor;
+    String statusLabel;
+
+    if (isAvailable) {
+      statusColor = Colors.green;
+      statusLabel = 'Available';
+    } else if (isInMaintenance) {
+      statusColor = Colors.orange;
+      statusLabel = 'In Maintenance';
+    } else if (isRetired) {
+      statusColor = Colors.grey[700]!;
+      statusLabel = 'Retired';
+    } else {
+      statusColor = Colors.red;
+      statusLabel = 'Borrowed';
+    }
+
     final fallbackIcon = _getIconForCategory(equipment.categoryName);
 
     String specsString = [
@@ -562,11 +588,11 @@ class _CatalogPageState extends State<CatalogPage>
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: isAvailable ? Colors.green : Colors.red,
+                         color: statusColor,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        isAvailable ? 'Available' : 'Borrowed',
+                         statusLabel,
                         style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: 10,
