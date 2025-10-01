@@ -95,8 +95,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
             },
             child: Container(
               margin: const EdgeInsets.only(right: 16),
-              width: 30,
-              height: 30,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(

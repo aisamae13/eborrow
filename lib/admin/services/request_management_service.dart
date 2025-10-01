@@ -19,6 +19,7 @@ class RequestManagementService {
             status,
             created_at,
             modification_count,
+            rejection_reason,
             equipment(name, brand, image_url)
           ''')
           .eq('status', status)
@@ -31,7 +32,7 @@ class RequestManagementService {
         try {
           final userProfile = await supabase
               .from('user_profiles')
-              .select('first_name, last_name, student_id')
+              .select('first_name, last_name, student_id, avatar_url')
               .eq('id', request['borrower_id'])
               .single();
 
@@ -79,7 +80,7 @@ class RequestManagementService {
         message = 'Reminder: Your borrowed equipment "$equipmentName" is due for return in $daysUntilDue day(s).';
       }
 
-      // Create notification
+      // Create notification (This is not a status change, so it remains here)
       await NotificationService.createNotification(
         userId: borrowerId,
         title: 'Return Reminder',
@@ -125,7 +126,7 @@ class RequestManagementService {
         throw Exception('New return date must be after the current return date');
       }
 
-      // Update the return date
+      // Update the return date (This does not change the 'status', so no trigger needed)
       await supabase
           .from('borrow_requests')
           .update({'return_date': newReturnDate.toIso8601String()})
@@ -134,7 +135,7 @@ class RequestManagementService {
       // Calculate extension days
       final extensionDays = newReturnDate.difference(currentReturnDate).inDays;
 
-      // Send notification to borrower
+      // Send notification to borrower (This is not a status change, so it remains here)
       await NotificationService.createNotification(
         userId: borrowerId,
         title: 'Borrowing Period Extended',
@@ -178,24 +179,14 @@ static String _formatDate(DateTime date) {
     String equipmentName,
   ) async {
     try {
-      // Update request status
+      // ✅ FIX: Update request status. The DB trigger handles ALL notifications.
       await supabase
           .from('borrow_requests')
           .update({'status': 'approved'})
           .eq('request_id', requestId);
 
-      // Send notification to borrower
-      await NotificationService.createRequestApprovedNotification(
-        userId: borrowerId,
-        equipmentName: equipmentName,
-      );
+      // ❌ REMOVED: All manual notification calls are deleted.
 
-      // Notify all admins about the approval
-      await _notifyAllAdmins(
-        title: 'Request Approved',
-        message: 'Borrow request for "$equipmentName" has been approved.',
-        type: NotificationType.general,
-      );
     } catch (e) {
       throw Exception('Failed to approve request: $e');
     }
@@ -209,25 +200,17 @@ static String _formatDate(DateTime date) {
     String? reason,
   }) async {
     try {
-      // Update request status
+      // ✅ FIX: Update status to 'rejected'. The DB trigger handles ALL notifications.
       await supabase
-          .from('borrow_requests')
-          .update({'status': 'rejected'})
-          .eq('request_id', requestId);
+        .from('borrow_requests')
+        .update({
+          'status': 'cancelled',
+          'rejection_reason': reason,
+        })
+        .eq('request_id', requestId);
 
-      // Send notification to borrower
-      await NotificationService.createRequestRejectedNotification(
-        userId: borrowerId,
-        equipmentName: equipmentName,
-        reason: reason,
-      );
+      // ❌ REMOVED: All manual notification calls are deleted.
 
-      // Notify all admins about the rejection
-      await _notifyAllAdmins(
-        title: 'Request Rejected',
-        message: 'Borrow request for "$equipmentName" has been rejected.',
-        type: NotificationType.general,
-      );
     } catch (e) {
       throw Exception('Failed to reject request: $e');
     }
@@ -236,7 +219,7 @@ static String _formatDate(DateTime date) {
   // Mark equipment as returned
   static Future<void> markAsReturned(int requestId, int equipmentId) async {
     try {
-      // Get borrower info first
+      // Get borrower info first (needed for the DB trigger's message)
       final request = await supabase
           .from('borrow_requests')
           .select('borrower_id, equipment(name)')
@@ -246,7 +229,7 @@ static String _formatDate(DateTime date) {
       final borrowerId = request['borrower_id'];
       final equipmentName = request['equipment']['name'];
 
-      // Update request status
+      // ✅ FIX: Update request status. The DB trigger handles ALL notifications.
       await supabase
           .from('borrow_requests')
           .update({
@@ -255,27 +238,14 @@ static String _formatDate(DateTime date) {
           })
           .eq('request_id', requestId);
 
-      // Update equipment status to available
+      // Update equipment status to available (KEEP THIS)
       await supabase
           .from('equipment')
           .update({'status': 'available'})
           .eq('equipment_id', equipmentId);
 
-      // Notify borrower that return was confirmed
-      await NotificationService.createNotification(
-        userId: borrowerId,
-        title: 'Return Confirmed',
-        message: 'Your return of "$equipmentName" has been confirmed. Thank you!',
-        type: NotificationType.equipmentReturned,
-        metadata: {'equipment_name': equipmentName},
-      );
+      // ❌ REMOVED: All manual notification calls are deleted.
 
-      // Notify all admins about the return
-      await _notifyAllAdmins(
-        title: 'Equipment Returned',
-        message: '"$equipmentName" has been returned.',
-        type: NotificationType.equipmentReturned,
-      );
     } catch (e) {
       throw Exception('Failed to mark as returned: $e');
     }
@@ -284,7 +254,7 @@ static String _formatDate(DateTime date) {
   // Hand out equipment (change from approved to active)
   static Future<void> handOutEquipment(int requestId, int equipmentId) async {
     try {
-      // Get request info first
+      // Get request info first (needed for the DB trigger's message)
       final request = await supabase
           .from('borrow_requests')
           .select('borrower_id, equipment(name)')
@@ -294,39 +264,30 @@ static String _formatDate(DateTime date) {
       final borrowerId = request['borrower_id'];
       final equipmentName = request['equipment']['name'];
 
-      // Update request status to active
+      // ✅ FIX: Update request status to active. The DB trigger handles ALL notifications.
       await supabase
           .from('borrow_requests')
           .update({'status': 'active'})
           .eq('request_id', requestId);
 
-      // Update equipment status to borrowed
+      // Update equipment status to borrowed (KEEP THIS)
       await supabase
           .from('equipment')
           .update({'status': 'borrowed'})
           .eq('equipment_id', equipmentId);
 
-      // Notify borrower that equipment is handed out
-      await NotificationService.createNotification(
-        userId: borrowerId,
-        title: 'Equipment Handed Out',
-        message: 'You have received "$equipmentName". Please return it on time.',
-        type: NotificationType.general,
-        metadata: {'equipment_name': equipmentName},
-      );
+      // ❌ REMOVED: All manual notification calls are deleted.
 
-      // Notify all admins
-      await _notifyAllAdmins(
-        title: 'Equipment Handed Out',
-        message: '"$equipmentName" has been handed out to borrower.',
-        type: NotificationType.general,
-      );
     } catch (e) {
       throw Exception('Failed to hand out equipment: $e');
     }
   }
 
   // Helper method to notify all admins
+  // ⚠️ NOTE: This helper is now only used for `approveRequest`, `markAsReturned`,
+  // and `handOutEquipment` in the *old* logic. Since we removed all calls to it
+  // in those functions, this helper is now completely unused and can be deleted
+  // from your final production code if you confirm no other files call it.
   static Future<void> _notifyAllAdmins({
     required String title,
     required String message,

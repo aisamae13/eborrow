@@ -144,7 +144,7 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Equipment Details',
+          'Details',
           style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xFF2B326B),

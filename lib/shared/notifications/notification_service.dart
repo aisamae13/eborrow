@@ -108,53 +108,53 @@ class NotificationItem {
 
 // Real-time Notification Provider
 class NotificationProvider extends ChangeNotifier {
-    List<NotificationItem> _notifications = [];
-    int _unreadCount = 0;
-    bool _isLoading = false;
-    RealtimeChannel? _subscription;
+  List<NotificationItem> _notifications = [];
+  int _unreadCount = 0;
+  bool _isLoading = false;
+  RealtimeChannel? _subscription;
 
-    List<NotificationItem> get notifications => _notifications;
-    int get unreadCount => _unreadCount;
-    bool get isLoading => _isLoading;
+  List<NotificationItem> get notifications => _notifications;
+  int get unreadCount => _unreadCount;
+  bool get isLoading => _isLoading;
 
   void initializeRealtime(String userId) {
     _subscription?.unsubscribe();
     loadNotifications(userId); // Load initial data
 
     try {
-        // 🚀 EFFICIENCY FIX: Filter real-time events by user_id to reduce traffic and processing.
-        _subscription = supabase
-                .channel('user_$userId') // Use a user-specific channel name
-                 .onPostgresChanges(
-                  event: PostgresChangeEvent.insert,
-                  schema: 'public',
-                  table: 'notifications',
-                  // Filter: Only listen for inserts where user_id matches
-                  filter: PostgresChangeFilter(
-                       type: PostgresChangeFilterType.eq,  // 👈 FIX IS HERE
-                      column: 'user_id',
-                      value: userId,
-                  ),
-                  callback: _handleNewNotification,
-              )
-              .onPostgresChanges(
-                  event: PostgresChangeEvent.update,
-                  schema: 'public',
-                  table: 'notifications',
-                  // Filter: Only listen for updates where user_id matches
-                  filter: PostgresChangeFilter(
-                      type: PostgresChangeFilterType.eq,  // 👈 FIX IS HERE
-                      column: 'user_id',
-                      value: userId,
-                  ),
-                  callback: _handleUpdatedNotification,
-              )
-                .subscribe();
-        debugPrint('🟢 Real-time subscribed for user: $userId');
+      // 🚀 EFFICIENCY FIX: Filter real-time events by user_id to reduce traffic and processing.
+      _subscription = supabase
+          .channel('user_$userId') // Use a user-specific channel name
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'notifications',
+            // Filter: Only listen for inserts where user_id matches
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,   // 👈 FIX IS HERE
+              column: 'user_id',
+              value: userId,
+            ),
+            callback: _handleNewNotification,
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'notifications',
+            // Filter: Only listen for updates where user_id matches
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,   // 👈 FIX IS HERE
+              column: 'user_id',
+              value: userId,
+            ),
+            callback: _handleUpdatedNotification,
+          )
+          .subscribe();
+      debugPrint('🟢 Real-time subscribed for user: $userId');
     } catch (e) {
-        debugPrint('❌ Real-time subscription failed: $e');
+      debugPrint('❌ Real-time subscription failed: $e');
     }
-}
+  }
 
 
   void _handleNewNotification(PostgresChangePayload payload) {
@@ -228,7 +228,7 @@ class NotificationProvider extends ChangeNotifier {
       debugPrint('✅ Loaded ${_notifications.length} notifications, $_unreadCount unread');
       debugPrint('📋 Notification details:');
       for (var n in _notifications) {
-        debugPrint('  - ${n.title}: isRead=${n.isRead}, id=${n.id}');
+        debugPrint('   - ${n.title}: isRead=${n.isRead}, id=${n.id}');
       }
     } catch (e) {
       debugPrint('❌ Error loading notifications: $e');
@@ -239,11 +239,9 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
- Future<void> markAsRead(String notificationId) async {
+  Future<void> markAsRead(String notificationId) async {
     try {
       debugPrint('🔵 Attempting to mark notification $notificationId as read');
-
-      // Note: Removed the initial select for simplicity, as the update.select() serves a similar purpose.
 
       // Update the database
       final response = await supabase
@@ -255,7 +253,7 @@ class NotificationProvider extends ChangeNotifier {
       debugPrint('✅ Update response: $response');
 
       // 🚨 FIX: Only update local state if the database confirmed the change
-       if (response.isNotEmpty) {
+      if (response.isNotEmpty) {
         // Find the record in the returned response to get the confirmed data
         final updatedRecord = response[0];
         final updatedNotification = NotificationItem.fromMap(updatedRecord);
@@ -367,37 +365,9 @@ class NotificationService {
     );
   }
 
-  static Future<void> createRequestApprovedNotification({
-    required String userId,
-    required String equipmentName,
-  }) async {
-    await createNotification(
-      userId: userId,
-      title: 'Request Approved!',
-      message: 'Your borrow request for "$equipmentName" has been approved. Please proceed to the IT office.',
-      type: NotificationType.requestApproved,
-      metadata: {'equipment_name': equipmentName},
-    );
-  }
-
-  static Future<void> createRequestRejectedNotification({
-    required String userId,
-    required String equipmentName,
-    String? reason,
-  }) async {
-    String message = 'Your borrow request for "$equipmentName" has been rejected.';
-    if (reason != null && reason.isNotEmpty) {
-      message += ' Reason: $reason';
-    }
-
-    await createNotification(
-      userId: userId,
-      title: 'Request Rejected',
-      message: message,
-      type: NotificationType.requestRejected,
-      metadata: {'equipment_name': equipmentName, 'reason': reason},
-    );
-  }
+  // ⚠️ REMOVED: createRequestApprovedNotification (Now handled by DB trigger)
+  // ⚠️ REMOVED: createRequestRejectedNotification (Now handled by DB trigger)
+  // ⚠️ REMOVED: createEquipmentReturnedNotification (Now handled by DB trigger)
 
   static Future<void> createEquipmentOverdueNotification({
     required String userId, // This should probably be the admin's ID
@@ -409,20 +379,6 @@ class NotificationService {
       title: 'Equipment Overdue!',
       message: 'The equipment "$equipmentName" borrowed by $userName is now overdue.',
       type: NotificationType.equipmentOverdue,
-      metadata: {'equipment_name': equipmentName, 'user_name': userName},
-    );
-  }
-
-  static Future<void> createEquipmentReturnedNotification({
-    required String userId, // This should probably be the admin's ID
-    required String userName,
-    required String equipmentName,
-  }) async {
-    await createNotification(
-      userId: userId,
-      title: 'Equipment Returned',
-      message: 'The equipment "$equipmentName" has been returned by $userName.',
-      type: NotificationType.equipmentReturned,
       metadata: {'equipment_name': equipmentName, 'user_name': userName},
     );
   }

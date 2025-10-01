@@ -319,6 +319,18 @@ class RequestCard extends StatelessWidget {
     final userProfiles = request['user_profiles'] ?? {};
     final equipment = request['equipment'] ?? {};
 
+    // ➡️ ADDED: Check for rejection reason
+    final rejectionReason = request['rejection_reason'] as String?;
+
+    // ➡️ ADDED: Determine if it was rejected by admin
+    // We assume if a rejection_reason is present, it was admin-rejected.
+    // (A borrower cancellation wouldn't set this field).
+    final isAdminRejected = rejectionReason != null && rejectionReason.isNotEmpty;
+
+
+    // ➡️ ADDED: Extract avatar URL
+    final avatarUrl = userProfiles['avatar_url'] as String?;
+
     final userName =
         '${userProfiles['first_name'] ?? 'Unknown'} ${userProfiles['last_name'] ?? 'User'}'
             .trim();
@@ -338,8 +350,6 @@ class RequestCard extends StatelessWidget {
 
     final dateFormatter = DateFormat('MMM dd, yyyy');
     final timeFormatter = DateFormat('hh:mm a');
-
-    // REMOVED: final isOverdue = status == 'active' && DateTime.now().isAfter(returnDate);
 
     Color statusColor;
     String statusBadge;
@@ -367,7 +377,13 @@ class RequestCard extends StatelessWidget {
         break;
       case 'cancelled':
         statusColor = Colors.red;
-        statusBadge = 'Cancelled';
+        final rejectionReason = request['rejection_reason'] as String?;
+
+        if (rejectionReason != null && rejectionReason.isNotEmpty) {
+           statusBadge = 'Rejected';
+        } else {
+           statusBadge = 'Cancelled';
+        }
         break;
       case 'expired':
         statusColor = Colors.orange;
@@ -378,7 +394,7 @@ class RequestCard extends StatelessWidget {
         statusBadge = status.toUpperCase();
     }
 
-    final isCurrentOverdue = status.toLowerCase() == 'overdue'; // <--- SIMPLIFIED
+    final isCurrentOverdue = status.toLowerCase() == 'overdue';
 
     String getUserInitials(String name) {
       if (name.isEmpty) return 'U';
@@ -421,17 +437,30 @@ class RequestCard extends StatelessWidget {
         children: [
           Row(
             children: [
+              // ➡️ MODIFIED: CircleAvatar to display Network Image or Initials
               CircleAvatar(
                 radius: 20,
-                backgroundColor: statusColor.withOpacity(0.1),
-                child: Text(
-                  getUserInitials(userName),
-                  style: GoogleFonts.poppins(
-                    color: statusColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
+                // 1. Check if we have a valid avatar URL to use for the image
+                backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+                    ? NetworkImage(avatarUrl)
+                    : null,
+
+                // 2. Set background color: Neutral for image, or status-based for initials
+                backgroundColor: (avatarUrl != null && avatarUrl.isNotEmpty)
+                    ? Colors.grey // Neutral background when image is loaded
+                    : statusColor.withOpacity(0.1), // Original background for initials
+
+                // 3. Fallback: Only show initials (the existing child logic) if NO avatar URL is set
+                child: (avatarUrl == null || avatarUrl.isEmpty)
+                    ? Text(
+                        getUserInitials(userName),
+                        style: GoogleFonts.poppins(
+                          color: statusColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      )
+                    : null, // No child when an image is loaded
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -591,6 +620,7 @@ class RequestCard extends StatelessWidget {
             borrowerId,
             equipmentName,
             equipmentId,
+            isAdminRejected,
           ),
         ],
       ),
@@ -604,6 +634,7 @@ class RequestCard extends StatelessWidget {
   String borrowerId,
   String equipmentName,
   int equipmentId,
+  bool isAdminRejected,
 ) {
   switch (status.toLowerCase()) {
     case 'pending':
@@ -711,12 +742,11 @@ class RequestCard extends StatelessWidget {
         ],
       );
 
-    case 'overdue': // 🟢 NEW: Critical status requiring urgent action
+    case 'overdue':
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Highlight text to show item is overdue
           Text(
             'Action Required: Item is Overdue',
             style: GoogleFonts.poppins(
@@ -774,7 +804,6 @@ class RequestCard extends StatelessWidget {
         ],
       );
 
-    // Existing cases below remain the same
     case 'returned':
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -808,7 +837,7 @@ class RequestCard extends StatelessWidget {
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Cancelled by user',
+                isAdminRejected ? 'Rejected by Admin' : 'Cancelled by user',
                 style: GoogleFonts.poppins(
                   color: Colors.red,
                   fontWeight: FontWeight.w500,
@@ -820,6 +849,7 @@ class RequestCard extends StatelessWidget {
           ],
         ),
       );
+
 
     case 'expired':
       return Column(
@@ -919,47 +949,57 @@ class RequestCard extends StatelessWidget {
   }
 }
   void _showRejectDialog(
-    BuildContext context,
-    int requestId,
-    String borrowerId,
-    String equipmentName,
-  ) {
-    final reasonController = TextEditingController();
+  BuildContext context,
+  int requestId,
+  String borrowerId,
+  String equipmentName,
+) {
+  final reasonController = TextEditingController();
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reject Request'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Are you sure you want to reject this request?'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Reason (optional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Reject Request'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Are you sure you want to reject this request?'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: reasonController,
+            decoration: const InputDecoration(
+              labelText: 'Reason *', // <-- CHANGED: Remove (optional)
+              hintText: 'Enter rejection reason',
+              border: OutlineInputBorder(),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            maxLines: 2,
           ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await RequestManagementService.rejectRequest(
-                  requestId,
-                  borrowerId,
-                  equipmentName,
-                  reason: reasonController.text.trim().isNotEmpty
-                      ? reasonController.text.trim()
-                      : null,
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            // ADDED: Validation
+            if (reasonController.text.trim().isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please provide a rejection reason'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              return;
+            }
+
+            try {
+              await RequestManagementService.rejectRequest(
+                requestId,
+                borrowerId,
+                equipmentName,
+                reason: reasonController.text.trim(),
                 );
                 if (context.mounted) {
                   Navigator.pop(context);

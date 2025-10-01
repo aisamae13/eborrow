@@ -2,7 +2,7 @@ import 'package:eborrow/shared/notifications/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart'; // Add this import
+import 'package:provider/provider.dart';
 import '/main.dart';
 
 class NotificationPage extends StatefulWidget {
@@ -19,22 +19,19 @@ class _NotificationPageState extends State<NotificationPage> {
   void initState() {
     super.initState();
 
-    // FIX: Defer _loadNotifications() until after the widget has finished building
-    // the current frame. This prevents the "setState during build" error, and correctly
-    // triggers the initial fast loading state.
+    // ✅ FIX: Call initializeRealtime. This function handles both
+    // the initial data fetch (loadNotifications) and the Realtime subscription
+    // to ensure fast loading and continuous updates.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadNotifications();
+      final userId = supabase.auth.currentUser?.id;
+      if (userId != null) {
+        context.read<NotificationProvider>().initializeRealtime(userId);
+      }
     });
   }
 
-  void _loadNotifications() {
-    final userId = supabase.auth.currentUser?.id;
-    if (userId != null) {
-      // Use the provider to load notifications
-      // This call internally calls notifyListeners(), hence the need for deferral.
-      context.read<NotificationProvider>().loadNotifications(userId);
-    }
-  }
+  // ❌ NOTE: The original _loadNotifications() function is removed here
+  // because its logic is now correctly handled inside NotificationProvider.initializeRealtime().
 
   void _markAsRead(NotificationItem notification) {
     if (!notification.isRead) {

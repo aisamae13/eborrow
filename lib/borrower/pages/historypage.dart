@@ -5,6 +5,7 @@ import '../../main.dart';
 import '../models/borrow_request.dart';
 import 'package:eborrow/shared/utils/string_extension.dart';
 import 'modify_request_page.dart';
+import 'request_detail_popup.dart';
 import '../../shared/notifications/notification_service.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -55,7 +56,7 @@ class _HistoryPageState extends State<HistoryPage>
     try {
       final response = await supabase
           .from('borrow_requests')
-          .select('*, equipment(name)')
+          .select('*, equipment(name, image_url)')
           .eq('borrower_id', userId)
           .order('created_at', ascending: false);
 
@@ -462,86 +463,145 @@ class _HistoryPageState extends State<HistoryPage>
     final dateTimeFormatter = DateFormat('MMM dd, yyyy hh:mm a');
 
     final isPending = item.status.toLowerCase() == 'pending';
-    String statusDescription = _getStatusDescription(item.status.toLowerCase());
+    String statusDescription = _getStatusDescription(item.status.toLowerCase(), item);
 
-    return Container(
+    // 💡 NEW: Gamitin ang image URL, o isang placeholder kung walang image
+    final imageUrl = item.equipmentImageUrl;
+    const placeholderUrl =
+        'https://via.placeholder.com/70/D3D3D3/000000?text=No+Img';
+
+    return GestureDetector(
+  onTap: () {
+    // Call the external function here
+    showRequestDetailPopup(context, item);
+  },
+  child: Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
+            color: Colors.grey.withOpacity(0.15),
+            spreadRadius: 2,
+            blurRadius: 7,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Column(
+      child: Column( // Gumamit ng Column para ma-accommodate ang image ROW at ang buttons
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Row( // Ito ang main row para sa image at details
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Flexible(
-                child: Text(
-                  item.equipmentName,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+              // 1. Equipment Image (Left Side)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10.0),
+                child: Image.network(
+                  imageUrl ?? placeholderUrl,
+                  width: 70, // Fixed width
+                  height: 70, // Fixed height
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      width: 70,
+                      height: 70,
+                      color: Colors.grey.shade200,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    width: 70,
+                    height: 70,
+                    color: Colors.grey.shade200,
+                    child: const Icon(Icons.broken_image, color: Colors.grey),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10.0,
-                  vertical: 4.0,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-                child: Text(
-                  _getDisplayStatus(item.status),
-                  style: TextStyle(
-                    color: statusColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
+              const SizedBox(width: 16),
+
+              // 2. Details Column (Right Side)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            item.equipmentName,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Status Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10.0,
+                            vertical: 4.0,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12.0),
+                          ),
+                          child: Text(
+                            _getDisplayStatus(item.status, item),
+                            style: TextStyle(
+                              color: statusColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // Status description
+                    if (statusDescription.isNotEmpty)
+                      Text(
+                        statusDescription,
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+
+                    if (statusDescription.isNotEmpty) const SizedBox(height: 4),
+
+                    Text(
+                      'Requested: ${dateTimeFormatter.format(item.borrowDate)}',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    // Conditional date/reason info (from _buildDateInfo)
+                    _buildDateInfo(item, dateTimeFormatter, statusColor),
+                  ],
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 8),
-
-          // Status description
-          if (statusDescription.isNotEmpty)
-            Text(
-              statusDescription,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-
-          if (statusDescription.isNotEmpty) const SizedBox(height: 4),
-
-          Text(
-            'Requested: ${dateTimeFormatter.format(item.borrowDate)}',
-            style: TextStyle(color: Colors.grey[600], fontSize: 12),
-          ),
-
-          const SizedBox(height: 4),
-
-          // Show different date info based on status
-          _buildDateInfo(item, dateTimeFormatter, statusColor),
-
-          // Conditional buttons for pending requests only
+          // Conditional buttons for pending requests only (full width below the row)
           if (isPending) ...[
             const Divider(height: 24),
             Row(
@@ -549,7 +609,7 @@ class _HistoryPageState extends State<HistoryPage>
               children: [
                 OutlinedButton.icon(
                   icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('Modify'),
+                  label: Text('Modify${item.modificationCount >= 3 ? ' (Limit)' : ''}'),
                   onPressed: item.modificationCount >= 3
                       ? null
                       : () {
@@ -591,55 +651,63 @@ class _HistoryPageState extends State<HistoryPage>
           ],
         ],
       ),
-    );
+    ));
   }
 
   // Helper methods
-  String _getStatusDescription(String status) {
-    switch (status) {
-      case 'pending':
-        return 'Waiting for admin approval';
-      case 'approved':
-        return 'Approved - Ready for pickup';
-      case 'active':
-        return 'Currently borrowed by you';
-      case 'overdue':
-        return 'Past due date - Please return immediately';
-      case 'returned':
-        return 'Successfully returned';
-      case 'rejected':
-        return 'Request denied by admin';
-      case 'cancelled':
-        return 'Cancelled by you';
-      case 'expired':
-        return 'Request expired';
-      default:
-        return '';
-    }
+  String _getStatusDescription(String status, BorrowRequest item) {
+  switch (status) {
+    case 'pending':
+      return 'Waiting for admin approval';
+    case 'approved':
+      return 'Approved - Ready for pickup';
+    case 'active':
+      return 'Currently borrowed by you';
+    case 'overdue':
+      return 'Past due date - Please return immediately';
+    case 'returned':
+      return 'Successfully returned';
+    case 'rejected':
+      return 'Request denied by admin';
+    case 'cancelled':
+      // Check if there's a rejection reason - if yes, admin rejected it
+      if (item.rejectionReason != null && item.rejectionReason!.isNotEmpty) {
+        return 'Rejected by admin';
+      }
+      return 'Cancelled by you';
+    case 'expired':
+      return 'Request expired';
+    default:
+      return '';
   }
+}
 
-  String _getDisplayStatus(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return 'Pending';
-      case 'approved':
-        return 'Approved';
-      case 'active':
-        return 'Active';
-      case 'overdue':
-        return 'Overdue';
-      case 'returned':
-        return 'Returned';
-      case 'rejected':
+String _getDisplayStatus(String status, BorrowRequest item) {
+  switch (status.toLowerCase()) {
+    case 'pending':
+      return 'Pending';
+    case 'approved':
+      return 'Approved';
+    case 'active':
+      return 'Active';
+    case 'overdue':
+      return 'Overdue';
+    case 'returned':
+      return 'Returned';
+    case 'rejected':
+      return 'Rejected';
+    case 'cancelled':
+      // Check if there's a rejection reason - if yes, admin rejected it
+      if (item.rejectionReason != null && item.rejectionReason!.isNotEmpty) {
         return 'Rejected';
-      case 'cancelled':
-        return 'Cancelled';
-      case 'expired':
-        return 'Expired';
-      default:
-        return status.capitalize();
-    }
+      }
+      return 'Cancelled';
+    case 'expired':
+      return 'Expired';
+    default:
+      return status.capitalize();
   }
+}
 
   Widget _buildDateInfo(
     BorrowRequest item,
@@ -685,13 +753,33 @@ class _HistoryPageState extends State<HistoryPage>
         );
 
       case 'rejected':
+        final reason = item.rejectionReason;
+        final hasReason = reason != null && reason.isNotEmpty;
+
+        // Ipakita lang ang REASON kung meron, dahil ang Requested Date ay nasa itaas na ng card.
+        if (hasReason) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: Text(
+              'Reason: $reason',
+              style: TextStyle(
+                color: Colors.red.shade700,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          );
+        }
+        // Fallback or intentionally hide if no reason (uses SizedBox.shrink to avoid redundant date)
+        return const SizedBox.shrink();
+
       case 'cancelled':
-        return Text(
-          'Date: ${formatter.format(item.borrowDate)}',
-          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-        );
+        // Hahanapin ng user ang "Cancelled by you" description at ang Requested Date sa itaas,
+        // kaya wala nang kailangang idagdag na detalye dito.
+        return const SizedBox.shrink();
 
       default:
+        // Default na pag-display ng Due date
         return Text(
           'Due: ${formatter.format(item.returnDate)}',
           style: TextStyle(color: Colors.grey[600], fontSize: 12),

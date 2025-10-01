@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '../models/borrow_request.dart';
 import '../../main.dart';
 import '../../shared/profile/profile_page.dart';
 import '../../shared/notifications/notification_page.dart';
@@ -456,8 +457,8 @@ Widget _buildAvatarImage() {
  Widget _buildCategoryGrid(List<EquipmentCategory> categories) {
   final displayedCategories = _isCategoriesExpanded
       ? categories
-      : categories.take(6).toList();
-  final hasMore = categories.length > 6;
+      : categories.take(4).toList();
+  final hasMore = categories.length > 4;
 
   return Column(
     children: [
@@ -811,68 +812,6 @@ Widget _buildAvatarImage() {
   }
 }
 
-class BorrowRequest {
-  final int borrowId;
-  final String borrowerId;
-  final int equipmentId;
-  final DateTime requestedAt;
-  final DateTime borrowDate; // Add this if missing
-  final DateTime returnDate; // Add this if missing
-  final String status;
-  final String equipmentName;
-
-  BorrowRequest({
-    required this.borrowId,
-    required this.borrowerId,
-    required this.equipmentId,
-    required this.requestedAt,
-    required this.borrowDate,
-    required this.returnDate,
-    required this.status,
-    required this.equipmentName,
-  });
-
- // Inside homepage.dart
-factory BorrowRequest.fromMap(Map<String, dynamic> map) {
-    return BorrowRequest(
-      // Change 'borrow_id' to 'request_id'
-      borrowId: map['request_id'],
-      borrowerId: map['borrower_id'],
-      equipmentId: map['equipment_id'],
-      requestedAt: DateTime.parse(map['requested_at'] ?? map['created_at']),
-      borrowDate: DateTime.parse(map['borrow_date']),
-      returnDate: DateTime.parse(map['return_date']),
-      status: map['status'],
-      equipmentName: map['equipment']['name'],
-    );
-  }
-
-  // 🎯 MODIFIED: Removed front-end date check (isOverdue)
-  Color getStatusColor() {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Colors.orange;
-      case 'borrowed':
-      case 'active':
-        return Colors.blue;
-      case 'overdue': // <--- ADDED dedicated status
-        return Colors.red;
-      case 'returned':
-        return Colors.green;
-      case 'denied':
-      case 'cancelled':
-      case 'expired':
-        return Colors.grey;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String get formattedStatus {
-    if (status.isEmpty) return '';
-    return status[0].toUpperCase() + status.substring(1).toLowerCase();
-  }
-}
 class EquipmentCategory {
   final int id;
   final String name;
