@@ -1,6 +1,8 @@
+import 'package:eborrow/admin/services/equipment_management_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import '../pages/equipment_issues_page.dart';
 
 class EquipmentCard extends StatelessWidget {
   final Map<String, dynamic> equipment;
@@ -61,7 +63,19 @@ class EquipmentCard extends StatelessWidget {
       );
     }
   }
+Future<int> _getIssueCount(int equipmentId) async {
+  try {
+    final response = await supabase
+        .from('issues')
+        .select('issue_id')
+        .eq('equipment_id', equipmentId)
+        .neq('status', 'resolved'); // Only count unresolved issues
 
+    return response.length;
+  } catch (e) {
+    return 0;
+  }
+}
   Widget _buildGridCard(
     BuildContext context,
     String name,
@@ -206,37 +220,83 @@ class EquipmentCard extends StatelessWidget {
 
                           // Horizontal Action Buttons with Labels
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildLabeledButton(
-                                'QR',
-                                Icons.qr_code,
-                                Colors.blue,
-                                () => _showQRCode(context, equipmentId, name),
-                                buttonPadding,
-                                iconSize,
-                                buttonLabelSize,
-                              ),
-                              _buildLabeledButton(
-                                'Edit',
-                                Icons.edit,
-                                Colors.orange,
-                                onEdit,
-                                buttonPadding,
-                                iconSize,
-                                buttonLabelSize,
-                              ),
-                              _buildLabeledButton(
-                                'More',
-                                Icons.more_vert,
-                                Colors.grey[600]!,
-                                () => _showOptionsMenu(context),
-                                buttonPadding,
-                                iconSize,
-                                buttonLabelSize,
-                              ),
-                            ],
-                          ),
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildLabeledButton(
+                              'QR',
+                              Icons.qr_code,
+                              Colors.blue,
+                              () => _showQRCode(context, equipmentId, name),
+                              buttonPadding,
+                              iconSize,
+                              buttonLabelSize,
+                            ),
+                            // ADD ISSUES BUTTON HERE
+                            FutureBuilder<int>(
+                              future: _getIssueCount(equipmentId),
+                              builder: (context, snapshot) {
+                                final issueCount = snapshot.data ?? 0;
+                                return Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    _buildLabeledButton(
+                                      'Issues',
+                                      Icons.report_problem_outlined,
+                                      issueCount > 0 ? Colors.red : Colors.grey,
+                                      () => _navigateToEquipmentIssues(context, equipmentId, name),
+                                      buttonPadding,
+                                      iconSize,
+                                      buttonLabelSize,
+                                    ),
+                                    if (issueCount > 0)
+                                      Positioned(
+                                        right: -4,
+                                        top: -4,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 16,
+                                            minHeight: 16,
+                                          ),
+                                          child: Text(
+                                            '$issueCount',
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.white,
+                                              fontSize: 8,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
+                            _buildLabeledButton(
+                              'Edit',
+                              Icons.edit,
+                              Colors.orange,
+                              onEdit,
+                              buttonPadding,
+                              iconSize,
+                              buttonLabelSize,
+                            ),
+                            _buildLabeledButton(
+                              'More',
+                              Icons.more_vert,
+                              Colors.grey[600]!,
+                              () => _showOptionsMenu(context),
+                              buttonPadding,
+                              iconSize,
+                              buttonLabelSize,
+                            ),
+                          ],
+                        ),
                         ],
                       ),
                     ),
@@ -249,7 +309,17 @@ class EquipmentCard extends StatelessWidget {
       ),
     );
   }
-
+void _navigateToEquipmentIssues(BuildContext context, int equipmentId, String equipmentName) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => EquipmentIssuesPage(
+        equipmentId: equipmentId,
+        equipmentName: equipmentName,
+      ),
+    ),
+  );
+}
   Widget _buildLabeledButton(
     String label,
     IconData icon,

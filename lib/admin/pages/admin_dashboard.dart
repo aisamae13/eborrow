@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/recent_activities_widget.dart';
 import '../services/admin_dashboard_service.dart';
+import '../services/admin_auth_service.dart';
 import 'package:provider/provider.dart';
 import '../../shared/notifications/notification_page.dart';
 import '../../shared/notifications/notification_with_badge.dart';
 import '../../shared/notifications/notification_service.dart';
 import '../../main.dart';
+import 'admin_profile_page.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -17,21 +19,39 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   late Future<Map<String, dynamic>> _dashboardData;
+  Map<String, dynamic>? _profileData;
 
   @override
   void initState() {
     super.initState();
     _dashboardData = AdminDashboardService.getDashboardData();
-     _initializeNotifications();
+    _initializeNotifications();
+    _fetchProfile();
   }
-void _initializeNotifications() { // ADD THIS ENTIRE METHOD
-  final user = supabase.auth.currentUser;
-  if (user != null) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NotificationProvider>().initializeRealtime(user.id);
-    });
+
+  void _initializeNotifications() {
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<NotificationProvider>().initializeRealtime(user.id);
+      });
+    }
   }
-}
+
+  Future<void> _fetchProfile() async {
+    try {
+      final profile = await AdminAuthService.getAdminProfile();
+      if (mounted) {
+        setState(() {
+          _profileData = profile;
+        });
+      }
+    } catch (e) {
+      // Silent fail - just won't show profile picture
+      debugPrint('Error fetching profile: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -52,7 +72,7 @@ void _initializeNotifications() { // ADD THIS ENTIRE METHOD
           ],
         ),
         backgroundColor: const Color(0xFF2B326B),
-       actions: [
+        actions: [
           RealtimeNotificationBadge(
             onTap: () {
               Navigator.push(
@@ -64,6 +84,53 @@ void _initializeNotifications() { // ADD THIS ENTIRE METHOD
             },
           ),
           const SizedBox(width: 12),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AdminProfilePage(),
+                ),
+              );
+            },
+            child: Container(
+              margin: const EdgeInsets.only(right: 16),
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFFFFC107),
+                  width: 2,
+                ),
+              ),
+              child: ClipOval(
+                child: _profileData != null
+                    ? Image.network(
+                        'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: const Color(0xFFFFC107),
+                            child: const Icon(
+                              Icons.admin_panel_settings,
+                              size: 20,
+                              color: Color(0xFF2B326B),
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        color: const Color(0xFFFFC107),
+                        child: const Icon(
+                          Icons.admin_panel_settings,
+                          size: 20,
+                          color: Color(0xFF2B326B),
+                        ),
+                      ),
+              ),
+            ),
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4.0),
@@ -75,6 +142,7 @@ void _initializeNotifications() { // ADD THIS ENTIRE METHOD
           setState(() {
             _dashboardData = AdminDashboardService.getDashboardData();
           });
+          await _fetchProfile();
         },
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
@@ -254,7 +322,7 @@ void _initializeNotifications() { // ADD THIS ENTIRE METHOD
       crossAxisCount: 2,
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
-      childAspectRatio: 1.4, // 🔧 INCREASED from 1.2 to 1.4 for more height
+      childAspectRatio: 1.4,
       children: [
         _buildStatCard(
           'Pending Requests',
@@ -291,7 +359,7 @@ void _initializeNotifications() { // ADD THIS ENTIRE METHOD
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(5), // 🔧 REDUCED from 16 to 12
+      padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
@@ -306,10 +374,10 @@ void _initializeNotifications() { // ADD THIS ENTIRE METHOD
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min, // 🔧 ADDED to prevent overflow
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(8), // 🔧 REDUCED from 12 to 8
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
@@ -318,33 +386,30 @@ void _initializeNotifications() { // ADD THIS ENTIRE METHOD
               icon,
               color: color,
               size: 24,
-            ), // 🔧 REDUCED from 28 to 24
+            ),
           ),
-          const SizedBox(height: 8), // 🔧 REDUCED from 12 to 8
+          const SizedBox(height: 8),
           Flexible(
-            // 🔧 WRAPPED in Flexible to prevent overflow
             child: Text(
               value,
               style: GoogleFonts.poppins(
-                fontSize: 20, // 🔧 REDUCED from 24 to 20
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
             ),
           ),
-          const SizedBox(height: 2), // 🔧 REDUCED from 4 to 2
+          const SizedBox(height: 2),
           Flexible(
-            // 🔧 WRAPPED in Flexible to prevent overflow
             child: Text(
               title,
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
-                fontSize: 12, // 🔧 REDUCED from 14 to 12
+                fontSize: 12,
                 color: Colors.grey[600],
               ),
-              maxLines: 2, // 🔧 ADDED to prevent long text overflow
-              overflow:
-                  TextOverflow.ellipsis, // 🔧 ADDED for text overflow handling
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

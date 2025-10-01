@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../pages/admin_dashboard.dart';
-import '../pages/requests_management_page.dart'; // Fixed: Added 's'
+import '../pages/requests_management_page.dart';
 import '../pages/equipment_management_page.dart';
-import '../pages/admin_profile_page.dart';
+import '../pages/issues_management_page.dart';
 import '../pages/user_management_page.dart';
 
 class AdminBottomNav extends StatefulWidget {
@@ -21,11 +21,11 @@ class _AdminBottomNavState extends State<AdminBottomNav> {
   void initState() {
     super.initState();
     _pages = [
-       const AdminDashboard(),
-    const RequestsManagementPage(),
-    const EquipmentManagementPage(),
-     const UserManagementScreen(),
-    const AdminProfilePage(),
+      const AdminDashboard(),
+      const RequestsManagementPage(),
+      const EquipmentManagementPage(),
+      const IssuesManagementPage(),
+      const UserManagementScreen(),
     ];
   }
 
@@ -45,6 +45,8 @@ class _AdminBottomNavState extends State<AdminBottomNav> {
         onTap: _onItemTapped,
         selectedItemColor: const Color(0xFF2B326B),
         unselectedItemColor: Colors.grey,
+        selectedFontSize: 12,
+        unselectedFontSize: 11,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
@@ -55,11 +57,14 @@ class _AdminBottomNavState extends State<AdminBottomNav> {
             icon: Icon(Icons.inventory_2),
             label: 'Equipment',
           ),
-             BottomNavigationBarItem(
+          BottomNavigationBarItem(
+            icon: Icon(Icons.report_problem),
+            label: 'Issues',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.people),
             label: 'Users',
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );

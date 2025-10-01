@@ -59,7 +59,7 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text(
-          'Equipment Management',
+          'Equipments',
           style: GoogleFonts.poppins(
             fontSize: 24,
             fontWeight: FontWeight.w500,
