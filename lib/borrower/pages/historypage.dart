@@ -47,37 +47,40 @@ class _HistoryPageState extends State<HistoryPage>
     _requestsFuture ??= _fetchBorrowRequests();
   }
 
-  Future<List<BorrowRequest>> _fetchBorrowRequests() async {
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) {
-      return [];
-    }
-
-    try {
-      final response = await supabase
-          .from('borrow_requests')
-          .select('*, equipment(name, image_url)')
-          .eq('borrower_id', userId)
-          .order('created_at', ascending: false);
-
-      final requestList = response
-          .map((map) => BorrowRequest.fromMap(map))
-          .toList();
-      return requestList;
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Error fetching history. Check your connection.',
-            ),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-      rethrow;
-    }
+ Future<List<BorrowRequest>> _fetchBorrowRequests() async {
+  final userId = supabase.auth.currentUser?.id;
+  if (userId == null) {
+    return [];
   }
+
+  try {
+    // Scan for overdue requests before fetching
+    await supabase.rpc('scan_overdue_requests');
+
+    final response = await supabase
+        .from('borrow_requests')
+        .select('*, equipment(name, image_url)')
+        .eq('borrower_id', userId)
+        .order('created_at', ascending: false);
+
+    final requestList = response
+        .map((map) => BorrowRequest.fromMap(map))
+        .toList();
+    return requestList;
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Error fetching history. Check your connection.',
+          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+    rethrow;
+  }
+}
 
   Future<void> _refreshData() async {
     if (_isRefreshing) return; // Prevent multiple simultaneous refreshes

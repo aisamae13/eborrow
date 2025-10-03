@@ -3,10 +3,22 @@ import '../../shared/notifications/notification_service.dart';
 
 class RequestManagementService {
   // Get requests by status with user and equipment info
+  static Future<void> scanOverdueRequests() async {
+    try {
+      await supabase.rpc('scan_overdue_requests');
+    } catch (e) {
+      print('Error scanning overdue requests: $e');
+
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> getRequestsByStatus(
     String status,
   ) async {
     try {
+      // Scan for overdue requests before fetching
+      await scanOverdueRequests();
+
       final requests = await supabase
           .from('borrow_requests')
           .select('''
@@ -25,7 +37,7 @@ class RequestManagementService {
           .eq('status', status)
           .order('created_at', ascending: false);
 
-      // Get user info for each request
+      // Rest of your existing code...
       final requestsWithUsers = <Map<String, dynamic>>[];
 
       for (final request in requests) {
@@ -40,7 +52,6 @@ class RequestManagementService {
           requestWithUser['user_profiles'] = userProfile;
           requestsWithUsers.add(requestWithUser);
         } catch (e) {
-          // Skip requests where user profile can't be found
           print(
             'Could not find user profile for borrower_id: ${request['borrower_id']}',
           );
