@@ -165,12 +165,16 @@ class _ScanQRPageState extends State<ScanQRPage> with WidgetsBindingObserver {
       },
     );
 
+
+
     try {
-      final response = await supabase
+      final query = supabase
           .from('equipment')
           .select('*, equipment_categories(*)')
-          .eq('qr_code', qrCode)
-          .maybeSingle();
+          .eq('qr_code', qrCode);
+          
+
+      final response = await query.maybeSingle();
 
       // Dismiss the loading dialog
       Navigator.of(context).pop();

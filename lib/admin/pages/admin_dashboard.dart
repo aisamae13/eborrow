@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/recent_activities_widget.dart';
+import '../widgets/add_equipment_dialog.dart'; // Add this import
 import '../services/admin_dashboard_service.dart';
 import '../services/admin_auth_service.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +10,8 @@ import '../../shared/notifications/notification_with_badge.dart';
 import '../../shared/notifications/notification_service.dart';
 import '../../main.dart';
 import 'admin_profile_page.dart';
+import 'generate_qr_page.dart';
+import 'equipment_management_page.dart'; // Import the Equipment Management page
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -50,6 +53,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
       // Silent fail - just won't show profile picture
       debugPrint('Error fetching profile: $e');
     }
+  }
+
+  Future<void> _refreshDashboard() async {
+    setState(() {
+      _dashboardData = AdminDashboardService.getDashboardData();
+    });
+    await _fetchProfile();
   }
 
   @override
@@ -138,12 +148,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: () async {
-          setState(() {
-            _dashboardData = AdminDashboardService.getDashboardData();
-          });
-          await _fetchProfile();
-        },
+        onRefresh: _refreshDashboard,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -246,22 +251,37 @@ class _AdminDashboardState extends State<AdminDashboard> {
       children: [
         Expanded(
           child: _buildQuickActionCard(
-            'Add Equipment',
+            'Add\nEquipment', // Split into two lines for better balance
             Icons.add_circle_outline,
             Colors.blue,
             () {
-              // Navigate to add equipment page
+              // Navigate to Equipment Management page
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EquipmentManagementPage(),
+                ),
+              ).then((_) {
+                // Refresh dashboard when returning
+                _refreshDashboard();
+              });
             },
           ),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: _buildQuickActionCard(
-            'Generate QR',
+            'Generate\nQR Code', // Split into two lines for better balance
             Icons.qr_code,
             Colors.green,
             () {
               // Navigate to QR generator
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GenerateQRPage(),
+                ),
+              );
             },
           ),
         ),
@@ -304,9 +324,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
             const SizedBox(height: 12),
             Text(
               title,
+              textAlign: TextAlign.center, // Center align the text
               style: GoogleFonts.poppins(
                 fontWeight: FontWeight.w600,
-                fontSize: 16,
+                fontSize: 14, // Slightly smaller font size for better fit
+                height: 1.2, // Adjust line height for better spacing
               ),
             ),
           ],
