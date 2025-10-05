@@ -200,93 +200,88 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ClipRect( // Add ClipRect to clip overflowing content
-              child: ListView(
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 250,
+              width: double.infinity,
+              color: Colors.grey[200],
+              child:
+                  (widget.equipment.imageUrl != null &&
+                      widget.equipment.imageUrl!.isNotEmpty)
+                  ? Image.network(
+                      widget.equipment.imageUrl!,
+                      fit: BoxFit.contain,
+                    )
+                  : const Center(
+                      child: Icon(
+                        Icons.inventory_2_outlined,
+                        size: 100,
+                        color: Colors.grey,
+                      ),
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // --- 🚀 UPDATED STATUS BADGE DISPLAY ---
                   Container(
-                    height: 250,
-                    width: double.infinity,
-                    color: Colors.grey[200],
-                    child:
-                        (widget.equipment.imageUrl != null &&
-                            widget.equipment.imageUrl!.isNotEmpty)
-                        ? Image.network(
-                            widget.equipment.imageUrl!,
-                            fit: BoxFit.contain,
-                          )
-                        : const Center(
-                            child: Icon(
-                              Icons.inventory_2_outlined,
-                              size: 100,
-                              color: Colors.grey,
-                            ),
-                          ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // --- 🚀 UPDATED STATUS BADGE DISPLAY ---
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusBgColor, // Use calculated color
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            widget.equipment.status.toUpperCase(),
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                              color: statusFgColor, // Use calculated color
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ),
-                        // --- END UPDATED STATUS BADGE DISPLAY ---
-                        const SizedBox(height: 16),
-                        Text(
-                          widget.equipment.name,
-                          style: GoogleFonts.poppins(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        if (widget.equipment.brand != null)
-                          Text(
-                            'Brand: ${widget.equipment.brand}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        const Divider(height: 32),
-                        _buildDetailSection(
-                          'Specifications',
-                          widget.equipment.specifications.entries
-                              .map((e) => '${e.key}: ${e.value}')
-                              .join('\n'),
-                        ),
-                        if (widget.equipment.description != null)
-                          _buildDetailSection(
-                            'Description',
-                            widget.equipment.description!,
-                          ),
-                      ],
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusBgColor, // Use calculated color
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      widget.equipment.status.toUpperCase(),
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        color: statusFgColor, // Use calculated color
+                        letterSpacing: 1,
+                      ),
                     ),
                   ),
+                  // --- END UPDATED STATUS BADGE DISPLAY ---
+                  const SizedBox(height: 16),
+                  Text(
+                    widget.equipment.name,
+                    style: GoogleFonts.poppins(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  if (widget.equipment.brand != null)
+                    Text(
+                      'Brand: ${widget.equipment.brand}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  const Divider(height: 32),
+                  _buildDetailSection(
+                    'Specifications',
+                    widget.equipment.specifications.entries
+                        .map((e) => '${e.key}: ${e.value}')
+                        .join('\n'),
+                  ),
+                  if (widget.equipment.description != null)
+                    _buildDetailSection(
+                      'Description',
+                      widget.equipment.description!,
+                    ),
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       // --- 🚀 UPDATED BOTTOM NAVIGATION BAR ---
       bottomNavigationBar: Padding(

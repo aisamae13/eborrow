@@ -25,19 +25,6 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _acceptPrivacyPolicy = false;
   bool _acceptTermsConditions = false;
 
-  // Password validation states
-  bool _hasMinLength = false;
-  bool _hasUppercase = false;
-  bool _hasLowercase = false;
-  bool _hasNumber = false;
-  bool _hasSpecialChar = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _passwordController.addListener(_checkPasswordStrength);
-  }
-
   @override
   void dispose() {
     _firstNameController.dispose();
@@ -49,26 +36,12 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  void _checkPasswordStrength() {
-    final password = _passwordController.text;
-    setState(() {
-      _hasMinLength = password.length >= 8;
-      _hasUppercase = RegExp(r'[A-Z]').hasMatch(password);
-      _hasLowercase = RegExp(r'[a-z]').hasMatch(password);
-      _hasNumber = RegExp(r'[0-9]').hasMatch(password);
-      _hasSpecialChar = RegExp(r'[!@#$%^&*(),.?":{}|<>_-]').hasMatch(password);
-    });
-  }
-
   String? _validateFirstName(String? value) {
     if (value == null || value.isEmpty) {
       return 'First name is required';
     }
     if (value.length < 2) {
       return 'First name must be at least 2 characters';
-    }
-    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(value)) {
-      return 'First name can only contain letters and spaces';
     }
     return null;
   }
@@ -80,18 +53,13 @@ class _RegisterPageState extends State<RegisterPage> {
     if (value.length < 2) {
       return 'Last name must be at least 2 characters';
     }
-    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(value)) {
-      return 'Last name can only contain letters and spaces';
-    }
     return null;
   }
 
+  // Validation functions (including the new one for Student ID)
   String? _validateStudentId(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Student ID is required';
-    }
-    if (value.trim().length < 6) {
-      return 'Student ID must be at least 6 characters';
     }
     return null;
   }
@@ -107,34 +75,40 @@ class _RegisterPageState extends State<RegisterPage> {
     return null;
   }
 
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Password is required';
-    }
-
-    final List<String> errors = [];
-
-    if (value.length < 8) {
-      errors.add('At least 8 characters');
-    }
-    if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
-      errors.add('At least one lowercase letter');
-    }
-    if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
-      errors.add('At least one uppercase letter');
-    }
-    if (!RegExp(r'(?=.*\d)').hasMatch(value)) {
-      errors.add('At least one number');
-    }
-    if (!RegExp(r'(?=.*[!@#$%^&*(),.?":{}|<>_\-])').hasMatch(value)) {
-      errors.add('At least one special character (!@#\$%^&*(),.?":{}|<>_-)');
-    }
-
-    if (errors.isNotEmpty) {
-      return 'Password requirements not met';
-    }
-    return null;
+String? _validatePassword(String? value) {
+  if (value == null || value.isEmpty) {
+    return 'Password is required';
   }
+
+  final List<String> errors = [];
+
+  if (value.length < 8) {
+    errors.add('At least 8 characters');
+  }
+  if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
+    errors.add('At least one lowercase letter');
+  }
+  if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
+    errors.add('At least one uppercase letter');
+  }
+  if (!RegExp(r'(?=.*\d)').hasMatch(value)) {
+    errors.add('At least one number');
+  }
+  // ⭐️ ADDED: Check for an underscore symbol
+  if (!RegExp(r'(?=.*[_])').hasMatch(value)) {
+    errors.add('At least one underscore symbol (_)');
+  }
+  // 💡 Optional: If you meant any special character, use:
+  // if (!RegExp(r'(?=.*[\W_])').hasMatch(value)) {
+  //   errors.add('At least one special character');
+  // }
+
+
+  if (errors.isNotEmpty) {
+    return 'Password must contain:\n\u2022 ${errors.join('\n\u2022 ')}';
+  }
+  return null;
+}
 
   String? _validateConfirmPassword(String? value) {
     if (value == null || value.isEmpty) {
@@ -161,32 +135,6 @@ class _RegisterPageState extends State<RegisterPage> {
     return true;
   }
 
-  double _getPasswordStrength() {
-    int score = 0;
-    if (_hasMinLength) score++;
-    if (_hasUppercase) score++;
-    if (_hasLowercase) score++;
-    if (_hasNumber) score++;
-    if (_hasSpecialChar) score++;
-    return score / 5;
-  }
-
-  Color _getPasswordStrengthColor() {
-    double strength = _getPasswordStrength();
-    if (strength < 0.3) return Colors.red;
-    if (strength < 0.6) return Colors.orange;
-    if (strength < 0.8) return Colors.yellow[700]!;
-    return Colors.green;
-  }
-
-  String _getPasswordStrengthText() {
-    double strength = _getPasswordStrength();
-    if (strength < 0.3) return 'Weak';
-    if (strength < 0.6) return 'Fair';
-    if (strength < 0.8) return 'Good';
-    return 'Strong';
-  }
-
   void _handleSignUp() async {
     if (_formKey.currentState!.validate() && _validateConsents()) {
       setState(() {
@@ -197,6 +145,7 @@ class _RegisterPageState extends State<RegisterPage> {
         final response = await supabase.auth.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
+          // 2. ADDED student_id to the data sent to Supabase
           data: {
             'first_name': _firstNameController.text.trim(),
             'last_name': _lastNameController.text.trim(),
@@ -308,99 +257,6 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Widget _buildPasswordRequirements() {
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Password Requirements:',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          _buildRequirementItem('At least 8 characters', _hasMinLength),
-          _buildRequirementItem('One uppercase letter', _hasUppercase),
-          _buildRequirementItem('One lowercase letter', _hasLowercase),
-          _buildRequirementItem('One number', _hasNumber),
-          _buildRequirementItem('One special character', _hasSpecialChar),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRequirementItem(String text, bool isMet) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Icon(
-            isMet ? Icons.check_circle : Icons.radio_button_unchecked,
-            size: 16,
-            color: isMet ? Colors.green : Colors.grey[400],
-          ),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: GoogleFonts.poppins(
-              fontSize: 11,
-              color: isMet ? Colors.green[700] : Colors.grey[600],
-              fontWeight: isMet ? FontWeight.w500 : FontWeight.normal,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPasswordStrengthIndicator() {
-    if (_passwordController.text.isEmpty) return const SizedBox.shrink();
-    
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Password Strength: ',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-              Text(
-                _getPasswordStrengthText(),
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _getPasswordStrengthColor(),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          LinearProgressIndicator(
-            value: _getPasswordStrength(),
-            backgroundColor: Colors.grey[300],
-            valueColor: AlwaysStoppedAnimation<Color>(_getPasswordStrengthColor()),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -469,24 +325,70 @@ class _RegisterPageState extends State<RegisterPage> {
                     TextFormField(
                       controller: _firstNameController,
                       validator: _validateFirstName,
-                      decoration: _buildInputDecoration('Enter your first name'),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.grey[200],
+                        hintText: 'Enter your first name',
+                        hintStyle: TextStyle(
+                          color: Colors.grey[550],
+                          fontSize: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: BorderSide.none,
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 20),
 
-                    // Last Name Field
+                    // LAST NAME FIELD (Added this back)
                     Text(
                       'Last Name',
-                    style: GoogleFonts.poppins(color: Colors.black54),
+                      style: GoogleFonts.poppins(color: Colors.black54),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _lastNameController,
                       validator: _validateLastName,
-                      decoration: _buildInputDecoration('Enter your last name'),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.grey[200],
+                        hintText: 'Enter your last name',
+                        hintStyle: TextStyle(
+                          color: Colors.grey[550],
+                          fontSize: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: BorderSide.none,
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 20),
 
-                    // Student ID Field
+                    // STUDENT ID FIELD (Corrected)
                     Text(
                       'Student ID',
                       style: GoogleFonts.poppins(color: Colors.black54),
@@ -495,7 +397,30 @@ class _RegisterPageState extends State<RegisterPage> {
                     TextFormField(
                       controller: _studentIdController,
                       validator: _validateStudentId,
-                      decoration: _buildInputDecoration('Enter your student ID'),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.grey[200],
+                        hintText: 'Enter your student ID',
+                        hintStyle: TextStyle(
+                          color: Colors.grey[550],
+                          fontSize: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: BorderSide.none,
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 20),
 
@@ -509,7 +434,30 @@ class _RegisterPageState extends State<RegisterPage> {
                       controller: _emailController,
                       validator: _validateEmail,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: _buildInputDecoration('Enter your email'),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.grey[200],
+                        hintText: 'Enter your email',
+                        hintStyle: TextStyle(
+                          color: Colors.grey[550],
+                          fontSize: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: BorderSide.none,
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 20),
 
@@ -523,7 +471,29 @@ class _RegisterPageState extends State<RegisterPage> {
                       controller: _passwordController,
                       validator: _validatePassword,
                       obscureText: !_isPasswordVisible,
-                      decoration: _buildInputDecoration('Enter your password').copyWith(
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.grey[200],
+                        hintText: 'Enter your password',
+                        hintStyle: TextStyle(
+                          color: Colors.grey[550],
+                          fontSize: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: BorderSide.none,
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _isPasswordVisible
@@ -538,10 +508,6 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ),
                     ),
-                    // Password strength indicator
-                    _buildPasswordStrengthIndicator(),
-                    // Password requirements
-                    _buildPasswordRequirements(),
                     const SizedBox(height: 20),
 
                     // Confirm Password Field
@@ -554,18 +520,20 @@ class _RegisterPageState extends State<RegisterPage> {
                       controller: _confirmPasswordController,
                       validator: _validateConfirmPassword,
                       obscureText: !_isConfirmPasswordVisible,
-                      decoration: _buildInputDecoration('Confirm your password').copyWith(
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isConfirmPasswordVisible
-                                ? Icons.visibility
-                                : Icons.visibility_off,
+                      decoration: _buildInputDecoration('Confirm your password')
+                          .copyWith(
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isConfirmPasswordVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
+                              onPressed: () => setState(
+                                () => _isConfirmPasswordVisible =
+                                    !_isConfirmPasswordVisible,
+                              ),
+                            ),
                           ),
-                          onPressed: () => setState(
-                            () => _isConfirmPasswordVisible = !_isConfirmPasswordVisible,
-                          ),
-                        ),
-                      ),
                     ),
                     const SizedBox(height: 30),
 
@@ -597,7 +565,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                 child: GestureDetector(
                                   onTap: () {
                                     setState(() {
-                                      _acceptPrivacyPolicy = !_acceptPrivacyPolicy;
+                                      _acceptPrivacyPolicy =
+                                          !_acceptPrivacyPolicy;
                                     });
                                   },
                                   child: Padding(
@@ -620,8 +589,11 @@ class _RegisterPageState extends State<RegisterPage> {
                                                 'Privacy Policy',
                                                 style: GoogleFonts.poppins(
                                                   fontSize: 13,
-                                                  color: const Color(0xFF2E4F7A),
-                                                  decoration: TextDecoration.underline,
+                                                  color: const Color(
+                                                    0xFF2E4F7A,
+                                                  ),
+                                                  decoration:
+                                                      TextDecoration.underline,
                                                   fontWeight: FontWeight.w500,
                                                 ),
                                               ),
@@ -660,13 +632,15 @@ class _RegisterPageState extends State<RegisterPage> {
                               });
                             },
                             activeColor: const Color(0xFF2E4F7A),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
                           ),
                           Expanded(
                             child: GestureDetector(
                               onTap: () {
                                 setState(() {
-                                  _acceptTermsConditions = !_acceptTermsConditions;
+                                  _acceptTermsConditions =
+                                      !_acceptTermsConditions;
                                 });
                               },
                               child: Padding(
@@ -687,13 +661,16 @@ class _RegisterPageState extends State<RegisterPage> {
                                             style: GoogleFonts.poppins(
                                               fontSize: 13,
                                               color: const Color(0xFF2E4F7A),
-                                              decoration: TextDecoration.underline,
+                                              decoration:
+                                                  TextDecoration.underline,
                                               fontWeight: FontWeight.w500,
                                             ),
                                           ),
                                         ),
                                       ),
-                                      const TextSpan(text: ' of this application.'),
+                                      const TextSpan(
+                                        text: ' of this application.',
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -757,6 +734,7 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
+  // Add this helper function below your build method
   InputDecoration _buildInputDecoration(String hintText) {
     return InputDecoration(
       filled: true,

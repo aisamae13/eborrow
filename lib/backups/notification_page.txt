@@ -166,25 +166,6 @@ class _NotificationPageState extends State<NotificationPage> {
                           ),
                         ),
                       ),
-                      // 🆕 NEW: Show indicator for local notifications
-                      if (notification.isLocal)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade100,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            'LOCAL',
-                            style: GoogleFonts.poppins(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange.shade700,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(width: 8),
                       if (!notification.isRead)
                         Container(
                           width: 8,
@@ -206,40 +187,12 @@ class _NotificationPageState extends State<NotificationPage> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _timeFormat.format(notification.timestamp),
-                        style: GoogleFonts.poppins(
-                          color: Colors.grey[500],
-                          fontSize: 12,
-                        ),
-                      ),
-                      // 🆕 NEW: Show minutes remaining for return reminders
-                      if (notification.type == NotificationType.returnReminder &&
-                          notification.metadata?['minutes_remaining'] != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: notification.metadata!['is_urgent'] == true
-                                ? Colors.red.shade100
-                                : Colors.orange.shade100,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${notification.metadata!['minutes_remaining']} min left',
-                            style: GoogleFonts.poppins(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: notification.metadata!['is_urgent'] == true
-                                  ? Colors.red.shade700
-                                  : Colors.orange.shade700,
-                            ),
-                          ),
-                        ),
-                    ],
+                  Text(
+                    _timeFormat.format(notification.timestamp),
+                    style: GoogleFonts.poppins(
+                      color: Colors.grey[500],
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),

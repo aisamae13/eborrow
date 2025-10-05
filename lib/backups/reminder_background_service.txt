@@ -1,0 +1,352 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '/main.dart';
+import 'notification_service.dart';
+
+/// Background service that monitors active borrowings and sends time-based reminders
+/// Sends notifications at specific intervals: 24 hours, 1 hour, 15 minutes, and 5 minutes before due
+class ReminderBackgroundService {
+  static Timer? _globalTimer;
+  static final Set<String> _activeUsers = <String>{};
+  static final Map<String, Set<String>> _sentReminders = <String, Set<String>>{};
+  static bool _isServiceRunning = false;
+
+  /// Start the global background service for all users
+  /// Checks every 30 seconds for due reminders
+  static void startGlobalService() {
+    if (_isServiceRunning) {
+      debugPrint('🔄 Reminder service already running');
+      return;
+    }
+
+    _globalTimer?.cancel();
+    
+    // Check every 30 seconds for all active users
+    _globalTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _checkAllActiveUsers();
+    });
+    
+    _isServiceRunning = true;
+    debugPrint('🌍 Global reminder service started - checking every 30 seconds');
+  }
+
+  /// Add user to active monitoring
+  /// When a user logs in or becomes active, add them to the monitoring list
+  static void addActiveUser(String userId) {
+    _activeUsers.add(userId);
+    
+    // Initialize reminder tracking for this user if not exists
+    if (!_sentReminders.containsKey(userId)) {
+      _sentReminders[userId] = <String>{};
+    }
+    
+    debugPrint('👤 Added user $userId to reminder monitoring. Active users: ${_activeUsers.length}');
+    
+    // Start service if not running
+    if (!_isServiceRunning) {
+      startGlobalService();
+    }
+  }
+
+  /// Remove user from active monitoring
+  /// When a user logs out, remove them from monitoring
+  static void removeActiveUser(String userId) {
+    _activeUsers.remove(userId);
+    _sentReminders.remove(userId); // Clean up reminder tracking
+    
+    debugPrint('👤 Removed user $userId from reminder monitoring. Active users: ${_activeUsers.length}');
+    
+    // Stop global service if no active users
+    if (_activeUsers.isEmpty) {
+      stopGlobalService();
+    }
+  }
+
+  /// Stop the global service completely
+  static void stopGlobalService() {
+    _globalTimer?.cancel();
+    _globalTimer = null;
+    _isServiceRunning = false;
+    _sentReminders.clear();
+    debugPrint('🛑 Global reminder service stopped');
+  }
+
+  /// Check all active users for items that need reminders
+  static Future<void> _checkAllActiveUsers() async {
+    if (_activeUsers.isEmpty || !_isServiceRunning) return;
+
+    try {
+      debugPrint('⏰ Checking reminders for ${_activeUsers.length} active users');
+      
+      // Get all active borrowing requests for monitored users
+      final activeRequests = await supabase
+          .from('borrow_requests')
+          .select('request_id, borrower_id, return_date, equipment(name)')
+          .eq('status', 'active')
+          .inFilter('borrower_id', _activeUsers.toList());
+
+      if (activeRequests.isEmpty) {
+        debugPrint('📭 No active requests found for monitoring');
+        return;
+      }
+
+      final now = DateTime.now();
+      debugPrint('📊 Found ${activeRequests.length} active requests to check');
+
+      for (final request in activeRequests) {
+        await _processRequestReminder(request, now);
+      }
+    } catch (e) {
+      debugPrint('❌ Error in global reminder check: $e');
+    }
+  }
+
+  /// Process a single request to determine if reminders should be sent
+  static Future<void> _processRequestReminder(Map<String, dynamic> request, DateTime now) async {
+    try {
+      final returnDate = DateTime.parse(request['return_date']);
+      final equipmentName = request['equipment']['name'] ?? 'Unknown Equipment';
+      final requestId = request['request_id'].toString();
+      final userId = request['borrower_id'];
+      
+      // Calculate time until due
+      final timeUntilDue = returnDate.difference(now);
+      final minutesUntilDue = timeUntilDue.inMinutes;
+      final hoursUntilDue = timeUntilDue.inHours;
+      
+      debugPrint('📅 User: $userId, Equipment: $equipmentName, Minutes until due: $minutesUntilDue');
+
+      // Create unique reminder keys to prevent duplicates
+      final reminderKey24h = '${requestId}_24h';
+      final reminderKey1h = '${requestId}_1h';
+      final reminderKey15m = '${requestId}_15m';
+      final reminderKey5m = '${requestId}_5m';
+
+      final userReminders = _sentReminders[userId] ?? <String>{};
+
+      // Check and send appropriate reminders based on time remaining
+      
+      // 24 hours reminder (1 day before due)
+      if (hoursUntilDue <= 24 && hoursUntilDue > 1 && !userReminders.contains(reminderKey24h)) {
+        await _sendTimeBasedReminderWithCheck(
+          userId, 
+          equipmentName, 
+          int.parse(requestId), 
+          NotificationType.reminderToday,
+          'Due Today',
+          reminderKey24h
+        );
+      }
+      
+      // 1 hour reminder
+      else if (minutesUntilDue <= 60 && minutesUntilDue > 15 && !userReminders.contains(reminderKey1h)) {
+        await _sendTimeBasedReminderWithCheck(
+          userId, 
+          equipmentName, 
+          int.parse(requestId), 
+          NotificationType.reminder1Hour,
+          '1 Hour Remaining',
+          reminderKey1h
+        );
+      }
+      
+      // 15 minutes reminder
+      else if (minutesUntilDue <= 15 && minutesUntilDue > 5 && !userReminders.contains(reminderKey15m)) {
+        await _sendTimeBasedReminderWithCheck(
+          userId, 
+          equipmentName, 
+          int.parse(requestId), 
+          NotificationType.reminder15Minutes,
+          '15 Minutes Remaining',
+          reminderKey15m
+        );
+      }
+      
+      // 5 minutes reminder (URGENT)
+      else if (minutesUntilDue <= 5 && minutesUntilDue > 0 && !userReminders.contains(reminderKey5m)) {
+        await _sendTimeBasedReminderWithCheck(
+          userId, 
+          equipmentName, 
+          int.parse(requestId), 
+          NotificationType.reminder5Minutes,
+          'URGENT - 5 Minutes Left!',
+          reminderKey5m
+        );
+      }
+      
+      // Clean up old reminders if item is overdue or returned
+      else if (minutesUntilDue <= 0) {
+        _cleanupOldReminders(userId, requestId);
+      }
+      
+    } catch (e) {
+      debugPrint('❌ Error processing reminder for request: $e');
+    }
+  }
+
+  /// Send time-based reminder with duplicate prevention
+  static Future<void> _sendTimeBasedReminderWithCheck(
+    String userId, 
+    String equipmentName, 
+    int requestId, 
+    NotificationType type,
+    String description,
+    String reminderKey
+  ) async {
+    try {
+      String title;
+      String message;
+      String emoji;
+
+      switch (type) {
+        case NotificationType.reminderToday:
+          emoji = '📅';
+          title = '$emoji Return Due Today';
+          message = 'Your borrowed equipment "$equipmentName" is due for return today. Please plan your return accordingly.';
+          break;
+        case NotificationType.reminder1Hour:
+          emoji = '⏰';
+          title = '$emoji Return Reminder - 1 Hour';
+          message = 'Your borrowed equipment "$equipmentName" is due for return in 1 hour. Please start preparing for return.';
+          break;
+        case NotificationType.reminder15Minutes:
+          emoji = '⏰';
+          title = '$emoji Return Reminder - 15 Minutes';
+          message = 'Your borrowed equipment "$equipmentName" is due for return in 15 minutes. Please prepare to return it soon.';
+          break;
+        case NotificationType.reminder5Minutes:
+          emoji = '🚨';
+          title = '$emoji URGENT: Return in 5 Minutes!';
+          message = 'Your borrowed equipment "$equipmentName" is due for return in just 5 minutes! Please return it immediately to avoid being marked as overdue.';
+          break;
+        default:
+          debugPrint('⚠️ Unknown reminder type: $type');
+          return;
+      }
+
+      // Create the notification
+      await NotificationService.createNotification(
+        userId: userId,
+        title: title,
+        message: message,
+        type: type,
+        metadata: {
+          'equipment_name': equipmentName,
+          'request_id': requestId,
+          'reminder_type': reminderKey,
+          'description': description,
+        },
+      );
+
+      // Mark this reminder as sent
+      if (!_sentReminders.containsKey(userId)) {
+        _sentReminders[userId] = <String>{};
+      }
+      _sentReminders[userId]!.add(reminderKey);
+
+      debugPrint('🔔 Sent reminder: $description for "$equipmentName" to user $userId');
+    } catch (e) {
+      debugPrint('❌ Error sending reminder ($description): $e');
+    }
+  }
+
+  /// Clean up old reminder tracking for completed/overdue items
+  static void _cleanupOldReminders(String userId, String requestId) {
+    final userReminders = _sentReminders[userId];
+    if (userReminders != null) {
+      userReminders.removeWhere((key) => key.startsWith('${requestId}_'));
+      debugPrint('🧹 Cleaned up old reminders for request $requestId');
+    }
+  }
+
+  /// Force check reminders for a specific user (useful for testing or manual triggers)
+  static Future<void> checkUserReminders(String userId) async {
+    if (!_activeUsers.contains(userId)) {
+      debugPrint('⚠️ User $userId not in active monitoring list');
+      return;
+    }
+
+    try {
+      debugPrint('🔍 Manual reminder check for user: $userId');
+      
+      final activeRequests = await supabase
+          .from('borrow_requests')
+          .select('request_id, borrower_id, return_date, equipment(name)')
+          .eq('borrower_id', userId)
+          .eq('status', 'active');
+
+      final now = DateTime.now();
+
+      for (final request in activeRequests) {
+        await _processRequestReminder(request, now);
+      }
+    } catch (e) {
+      debugPrint('❌ Error in manual user reminder check: $e');
+    }
+  }
+
+  /// Get service status information for debugging
+  static Map<String, dynamic> getServiceStatus() {
+    return {
+      'isRunning': _isServiceRunning,
+      'activeUsersCount': _activeUsers.length,
+      'activeUsers': _activeUsers.toList(),
+      'reminderTrackingCount': _sentReminders.length,
+      'timerActive': _globalTimer?.isActive ?? false,
+    };
+  }
+
+  /// Reset the service (useful for testing or troubleshooting)
+  static void resetService() {
+    stopGlobalService();
+    _activeUsers.clear();
+    _sentReminders.clear();
+    debugPrint('🔄 Service reset completed');
+  }
+
+  /// Get active users count for external monitoring
+  static int get activeUsersCount => _activeUsers.length;
+  
+  /// Get active users list for debugging
+  static List<String> get activeUsersList => _activeUsers.toList();
+
+  /// Check if service is currently running
+  static bool get isServiceRunning => _isServiceRunning;
+
+  /// Get reminder statistics for debugging
+  static Map<String, int> getReminderStats() {
+    final stats = <String, int>{};
+    for (final userReminders in _sentReminders.values) {
+      for (final reminder in userReminders) {
+        if (reminder.endsWith('_24h')) {
+          stats['24h_reminders'] = (stats['24h_reminders'] ?? 0) + 1;
+        } else if (reminder.endsWith('_1h')) {
+          stats['1h_reminders'] = (stats['1h_reminders'] ?? 0) + 1;
+        } else if (reminder.endsWith('_15m')) {
+          stats['15m_reminders'] = (stats['15m_reminders'] ?? 0) + 1;
+        } else if (reminder.endsWith('_5m')) {
+          stats['5m_reminders'] = (stats['5m_reminders'] ?? 0) + 1;
+        }
+      }
+    }
+    return stats;
+  }
+
+  /// Manually trigger a test reminder (for development/testing)
+  static Future<void> sendTestReminder(String userId, NotificationType type) async {
+    try {
+      await _sendTimeBasedReminderWithCheck(
+        userId,
+        'Test Equipment',
+        999999, // Test request ID
+        type,
+        'Test Reminder',
+        'test_${DateTime.now().millisecondsSinceEpoch}'
+      );
+      debugPrint('🧪 Test reminder sent to user $userId');
+    } catch (e) {
+      debugPrint('❌ Error sending test reminder: $e');
+    }
+  }
+}

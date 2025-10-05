@@ -3,7 +3,6 @@ import '../borrower/pages/homepage.dart';
 import '../borrower/pages/catalogpage.dart';
 import '../borrower/pages/scanqr.dart';
 import '../borrower/pages/historypage.dart';
-import 'package:eborrow/borrower/pages/active_borrowings_page.dart';
 
 class BottomNav extends StatefulWidget {
   const BottomNav({super.key});
@@ -30,7 +29,6 @@ class _BottomNavState extends State<BottomNav> {
       const CatalogPage(),
       const ScanQRPage(),
       const HistoryPage(),
-      const ActiveBorrowingsPage(),
     ];
   }
 
@@ -61,11 +59,6 @@ class _BottomNavState extends State<BottomNav> {
             label: 'Scan QR',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Items'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.assignment_outlined),
-            activeIcon: Icon(Icons.assignment),
-            label: 'Borrowings',
-          ),
         ],
         currentIndex: _selectedIndex, // Set the current index
         selectedItemColor: const Color(0xFF4A55A2),
