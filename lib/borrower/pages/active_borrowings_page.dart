@@ -164,7 +164,7 @@ class _ActiveBorrowingsPageState extends State<ActiveBorrowingsPage> {
       try {
         // 🆕 NEW: Cancel any active reminders for this request
         LocalReminderService.cancelRemindersForRequest(request.requestId.toString());
-        
+
         // Create notification about the cancellation
         await NotificationService.createNotification(
           userId: request.borrowerId,
@@ -286,7 +286,7 @@ class _ActiveBorrowingsPageState extends State<ActiveBorrowingsPage> {
               children: [
                 // Status Summary Card
                 _buildStatusSummary(activeRequests),
-                
+
                 // Requests List
                 Expanded(
                   child: ListView.builder(
@@ -481,53 +481,54 @@ class _ActiveBorrowingsPageState extends State<ActiveBorrowingsPage> {
     );
   }
 
-  Widget _buildBorrowedItemCard(BorrowRequest item) {
-    final statusColor = item.getStatusColor();
-    final dateTimeFormatter = DateFormat('MMM dd, yyyy hh:mm a');
-    final isPending = item.status.toLowerCase() == 'pending';
-    final isOverdue = item.status.toLowerCase() == 'overdue';
-    String statusDescription = _getStatusDescription(item.status.toLowerCase(), item);
+Widget _buildBorrowedItemCard(BorrowRequest item) {
+  final statusColor = item.getStatusColor();
+  final dateTimeFormatter = DateFormat('MMM dd, yyyy hh:mm a');
+  final isPending = item.status.toLowerCase() == 'pending';
+  final isOverdue = item.status.toLowerCase() == 'overdue';
+  String statusDescription = _getStatusDescription(item.status.toLowerCase(), item);
 
-    final imageUrl = item.equipmentImageUrl;
-    const placeholderUrl = 'https://via.placeholder.com/70/D3D3D3/000000?text=No+Img';
+  final imageUrl = item.equipmentImageUrl;
+  const placeholderUrl = 'https://via.placeholder.com/70/D3D3D3/000000?text=No+Img';
 
-    return GestureDetector(
-      onTap: () {
-        showRequestDetailPopup(context, item);
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15.0),
-          border: isOverdue ? Border.all(color: Colors.red, width: 2) : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.15),
-              spreadRadius: 2,
-              blurRadius: 7,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Overdue Warning Banner
-            if (isOverdue) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.red[600], size: 16),
-                    const SizedBox(width: 8),
-                    Text(
+  return GestureDetector(
+    onTap: () {
+      showRequestDetailPopup(context, item);
+    },
+    child: Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15.0),
+        border: isOverdue ? Border.all(color: Colors.red, width: 2) : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.15),
+            spreadRadius: 2,
+            blurRadius: 7,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Overdue Warning Banner
+          if (isOverdue) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.red[600], size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
                       'OVERDUE - Please return immediately',
                       style: TextStyle(
                         color: Colors.red[700],
@@ -535,149 +536,165 @@ class _ActiveBorrowingsPageState extends State<ActiveBorrowingsPage> {
                         fontSize: 12,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-            ],
+            ),
+            const SizedBox(height: 12),
+          ],
 
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Equipment Image
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10.0),
-                  child: Image.network(
-                    imageUrl ?? placeholderUrl,
-                    width: 70,
-                    height: 70,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Container(
-                        width: 70,
-                        height: 70,
-                        color: Colors.grey.shade200,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: const Color(0xFF2B326B),
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                : null,
-                          ),
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) => Container(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Equipment Image
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10.0),
+                child: Image.network(
+                  imageUrl ?? placeholderUrl,
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
                       width: 70,
                       height: 70,
                       color: Colors.grey.shade200,
-                      child: const Icon(Icons.broken_image, color: Colors.grey),
-                    ),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: const Color(0xFF2B326B),
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    width: 70,
+                    height: 70,
+                    color: Colors.grey.shade200,
+                    child: const Icon(Icons.broken_image, color: Colors.grey),
                   ),
                 ),
-                const SizedBox(width: 16),
+              ),
+              const SizedBox(width: 12),
 
-                // Details Column
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible( // Wrap Text with Flexible
-                            child: Text(
-                              item.equipmentName,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Status Badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10.0,
-                              vertical: 4.0,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12.0),
-                            ),
-                            child: Text(
-                              _getDisplayStatus(item.status, item),
-                              style: GoogleFonts.poppins(
-                                color: statusColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // Status description
-                      if (statusDescription.isNotEmpty) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(6),
-                          ),
+              // Details Column - FIX: Use Expanded here
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // FIX: Equipment name and status in Column instead of Row
+                    Row(
+                      children: [
+                        Expanded(
                           child: Text(
-                            statusDescription,
+                            item.equipmentName,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
                             style: GoogleFonts.poppins(
-                              color: Colors.grey[700],
-                              fontSize: 11,
-                              fontStyle: FontStyle.italic,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
                       ],
+                    ),
+                    const SizedBox(height: 4),
 
-                      Row(
-                        children: [
-                          Icon(Icons.schedule, size: 14, color: Colors.grey[600]),
-                          const SizedBox(width: 4),
-                          Text(
+                    // Status Badge
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10.0,
+                          vertical: 4.0,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        child: Text(
+                          _getDisplayStatus(item.status, item),
+                          style: GoogleFonts.poppins(
+                            color: statusColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // Status description
+                    if (statusDescription.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          statusDescription,
+                          style: GoogleFonts.poppins(
+                            color: Colors.grey[700],
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+
+                    // FIX: Requested date with proper overflow handling
+                    Row(
+                      children: [
+                        Icon(Icons.schedule, size: 14, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
                             'Requested: ${dateTimeFormatter.format(item.borrowDate)}',
                             style: GoogleFonts.poppins(
-                              color: Colors.grey[600], 
-                              fontSize: 11,
+                              color: Colors.grey[600],
+                              fontSize: 10,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
 
-                      const SizedBox(height: 4),
+                    const SizedBox(height: 4),
 
-                      _buildDateInfo(item, dateTimeFormatter, statusColor),
-                    ],
-                  ),
+                    // FIX: Due date with proper overflow handling
+                    _buildDateInfo(item, dateTimeFormatter, statusColor),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
 
-            // Action Buttons for pending requests only
-            if (isPending) ...[
-              const Divider(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton.icon(
+          // Action Buttons for pending requests only
+          if (isPending) ...[
+            const Divider(height: 24),
+            // FIX: Buttons in responsive layout
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
                     icon: const Icon(Icons.edit, size: 16),
                     label: Text(
-                      item.modificationCount >= 3 
-                        ? 'Modify (Limit Reached)' 
-                        : 'Modify Request'
+                      item.modificationCount >= 3
+                        ? 'Limit Reached'
+                        : 'Modify',
+                      style: const TextStyle(fontSize: 12),
                     ),
                     onPressed: item.modificationCount >= 3
                         ? null
@@ -693,23 +710,26 @@ class _ActiveBorrowingsPageState extends State<ActiveBorrowingsPage> {
                             });
                           },
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: item.modificationCount >= 3 
-                        ? Colors.grey 
+                      foregroundColor: item.modificationCount >= 3
+                        ? Colors.grey
                         : const Color(0xFF2B326B),
                       side: BorderSide(
-                        color: item.modificationCount >= 3 
-                          ? Colors.grey 
+                        color: item.modificationCount >= 3
+                          ? Colors.grey
                           : const Color(0xFF2B326B),
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
                     icon: const Icon(Icons.cancel_outlined, size: 16),
-                    label: const Text('Cancel'),
+                    label: const Text('Cancel', style: TextStyle(fontSize: 12)),
                     onPressed: () => _cancelRequest(item),
                     style: ElevatedButton.styleFrom(
                       foregroundColor: Colors.white,
@@ -717,16 +737,18 @@ class _ActiveBorrowingsPageState extends State<ActiveBorrowingsPage> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ],
-        ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   // Helper methods
   String _getStatusDescription(String status, BorrowRequest item) {
@@ -760,67 +782,75 @@ class _ActiveBorrowingsPageState extends State<ActiveBorrowingsPage> {
   }
 
   Widget _buildDateInfo(
-    BorrowRequest item,
-    DateFormat formatter,
-    Color statusColor,
-  ) {
-    Widget dateWidget;
-    IconData iconData;
-    
-    switch (item.status.toLowerCase()) {
-      case 'pending':
-      case 'approved':
-        iconData = Icons.event;
-        dateWidget = Text(
-          'Due date: ${formatter.format(item.returnDate)}',
-          style: GoogleFonts.poppins(
-            color: Colors.grey[600], 
-            fontSize: 11,
-          ),
-        );
-        break;
+  BorrowRequest item,
+  DateFormat formatter,
+  Color statusColor,
+) {
+  Widget dateWidget;
+  IconData iconData;
 
-      case 'active':
-        iconData = Icons.schedule;
-        dateWidget = Text(
-          'Due: ${formatter.format(item.returnDate)}',
-          style: GoogleFonts.poppins(
-            color: statusColor,
-            fontWeight: FontWeight.bold,
-            fontSize: 11,
-          ),
-        );
-        break;
+  switch (item.status.toLowerCase()) {
+    case 'pending':
+    case 'approved':
+      iconData = Icons.event;
+      dateWidget = Text(
+        'Due date: ${formatter.format(item.returnDate)}',
+        style: GoogleFonts.poppins(
+          color: Colors.grey[600],
+          fontSize: 10,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+      break;
 
-      case 'overdue':
-        iconData = Icons.warning;
-        dateWidget = Text(
-          'Was due: ${formatter.format(item.returnDate)}',
-          style: GoogleFonts.poppins(
-            color: Colors.red,
-            fontWeight: FontWeight.bold,
-            fontSize: 11,
-          ),
-        );
-        break;
+    case 'active':
+      iconData = Icons.schedule;
+      dateWidget = Text(
+        'Due: ${formatter.format(item.returnDate)}',
+        style: GoogleFonts.poppins(
+          color: statusColor,
+          fontWeight: FontWeight.bold,
+          fontSize: 10,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+      break;
 
-      default:
-        iconData = Icons.event;
-        dateWidget = Text(
-          'Due: ${formatter.format(item.returnDate)}',
-          style: GoogleFonts.poppins(
-            color: Colors.grey[600], 
-            fontSize: 11,
-          ),
-        );
-    }
+    case 'overdue':
+      iconData = Icons.warning;
+      dateWidget = Text(
+        'Was due: ${formatter.format(item.returnDate)}',
+        style: GoogleFonts.poppins(
+          color: Colors.red,
+          fontWeight: FontWeight.bold,
+          fontSize: 10,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+      break;
 
-    return Row(
-      children: [
-        Icon(iconData, size: 14, color: statusColor),
-        const SizedBox(width: 4),
-        dateWidget,
-      ],
-    );
+    default:
+      iconData = Icons.event;
+      dateWidget = Text(
+        'Due: ${formatter.format(item.returnDate)}',
+        style: GoogleFonts.poppins(
+          color: Colors.grey[600],
+          fontSize: 10,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
   }
+
+  return Row(
+    children: [
+      Icon(iconData, size: 14, color: statusColor),
+      const SizedBox(width: 4),
+      Expanded(child: dateWidget),
+    ],
+  );
+}
 }
