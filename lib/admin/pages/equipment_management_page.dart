@@ -377,7 +377,7 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
         crossAxisCount: 2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 0.7, // ✅ Changed from 0.8 to 0.75 for more height
+        childAspectRatio: 0.7,
       ),
       itemCount: equipment.length,
       itemBuilder: (context, index) {
@@ -388,6 +388,16 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
           onStatusChange: (newStatus) =>
               _changeEquipmentStatus(equipment[index], newStatus),
           onRefresh: _loadData,
+          onShowMessage: (message, isSuccess) {
+            // Add this
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(message),
+                backgroundColor: isSuccess ? Colors.green : Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          },
         );
       },
     );
@@ -406,6 +416,16 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
           onStatusChange: (newStatus) =>
               _changeEquipmentStatus(equipment[index], newStatus),
           onRefresh: _loadData,
+          onShowMessage: (message, isSuccess) {
+            // Add this line
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(message),
+                backgroundColor: isSuccess ? Colors.green : Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          },
         );
       },
     );

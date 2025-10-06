@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../pages/equipment_issues_page.dart';
+import '../services/equipment_management_service.dart';
 
 class EquipmentCard extends StatelessWidget {
   final Map<String, dynamic> equipment;
@@ -11,6 +12,7 @@ class EquipmentCard extends StatelessWidget {
   final VoidCallback onDelete;
   final Function(String) onStatusChange;
   final VoidCallback onRefresh;
+  final Function(String, bool)? onShowMessage;
 
   const EquipmentCard({
     super.key,
@@ -20,6 +22,7 @@ class EquipmentCard extends StatelessWidget {
     required this.onDelete,
     required this.onStatusChange,
     required this.onRefresh,
+    this.onShowMessage,
   });
 
   @override
@@ -63,211 +66,21 @@ class EquipmentCard extends StatelessWidget {
       );
     }
   }
-  Future<void> _deleteEquipment(BuildContext context) async {
-  final equipmentId = equipment['equipment_id'];
-  final equipmentName = equipment['name'] ?? 'this equipment';
 
-  // Show confirmation dialog
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Row(
-        children: [
-          Icon(Icons.warning_amber_rounded, color: Colors.red[700], size: 28),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Delete Equipment',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
-          ),
-        ],
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Are you sure you want to delete this equipment?',
-            style: GoogleFonts.poppins(fontSize: 14),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.red[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.red[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.inventory_2, color: Colors.red[700], size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    equipmentName,
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '⚠️ This action cannot be undone.',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: Colors.red[700],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: Text(
-            'Cancel',
-            style: GoogleFonts.poppins(
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context, true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: Text(
-            'Delete',
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
+  Future<int> _getIssueCount(int equipmentId) async {
+    try {
+      final response = await supabase
+          .from('issues')
+          .select('issue_id')
+          .eq('equipment_id', equipmentId)
+          .neq('status', 'resolved'); // Only count unresolved issues
 
-  if (confirmed != true) return;
-
-  // Show loading indicator
-  if (context.mounted) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Center(
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text(
-                  'Deleting equipment...',
-                  style: GoogleFonts.poppins(),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  try {
-    // Delete from Supabase
-    await supabase
-        .from('equipment')
-        .delete()
-        .eq('equipment_id', equipmentId);
-
-    if (context.mounted) {
-      Navigator.pop(context); // Close loading dialog
-
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Equipment deleted successfully',
-                  style: GoogleFonts.poppins(),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-
-      // Refresh the list
-      onRefresh();
-    }
-  } catch (e) {
-    if (context.mounted) {
-      Navigator.pop(context); // Close loading dialog
-
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Failed to delete equipment: ${e.toString()}',
-                  style: GoogleFonts.poppins(),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          duration: const Duration(seconds: 4),
-        ),
-      );
+      return response.length;
+    } catch (e) {
+      return 0;
     }
   }
-}
-Future<int> _getIssueCount(int equipmentId) async {
-  try {
-    final response = await supabase
-        .from('issues')
-        .select('issue_id')
-        .eq('equipment_id', equipmentId)
-        .neq('status', 'resolved'); // Only count unresolved issues
 
-    return response.length;
-  } catch (e) {
-    return 0;
-  }
-}
   Widget _buildGridCard(
     BuildContext context,
     String name,
@@ -364,7 +177,11 @@ Future<int> _getIssueCount(int equipmentId) async {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(statusIcon, color: statusColor, size: statusIconSize),
+                                    Icon(
+                                      statusIcon,
+                                      color: statusColor,
+                                      size: statusIconSize,
+                                    ),
                                     SizedBox(width: isSmallScreen ? 2 : 4),
                                     Text(
                                       _getStatusText(status),
@@ -412,83 +229,89 @@ Future<int> _getIssueCount(int equipmentId) async {
 
                           // Horizontal Action Buttons with Labels
                           Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildLabeledButton(
-                              'QR',
-                              Icons.qr_code,
-                              Colors.blue,
-                              () => _showQRCode(context, equipmentId, name),
-                              buttonPadding,
-                              iconSize,
-                              buttonLabelSize,
-                            ),
-                            // ADD ISSUES BUTTON HERE
-                            FutureBuilder<int>(
-                              future: _getIssueCount(equipmentId),
-                              builder: (context, snapshot) {
-                                final issueCount = snapshot.data ?? 0;
-                                return Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    _buildLabeledButton(
-                                      'Issues',
-                                      Icons.report_problem_outlined,
-                                      issueCount > 0 ? Colors.red : Colors.grey,
-                                      () => _navigateToEquipmentIssues(context, equipmentId, name),
-                                      buttonPadding,
-                                      iconSize,
-                                      buttonLabelSize,
-                                    ),
-                                    if (issueCount > 0)
-                                      Positioned(
-                                        right: -4,
-                                        top: -4,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.red,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          constraints: const BoxConstraints(
-                                            minWidth: 16,
-                                            minHeight: 16,
-                                          ),
-                                          child: Text(
-                                            '$issueCount',
-                                            style: GoogleFonts.poppins(
-                                              color: Colors.white,
-                                              fontSize: 8,
-                                              fontWeight: FontWeight.bold,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildLabeledButton(
+                                'QR',
+                                Icons.qr_code,
+                                Colors.blue,
+                                () => _showQRCode(context, equipmentId, name),
+                                buttonPadding,
+                                iconSize,
+                                buttonLabelSize,
+                              ),
+                              // ADD ISSUES BUTTON HERE
+                              FutureBuilder<int>(
+                                future: _getIssueCount(equipmentId),
+                                builder: (context, snapshot) {
+                                  final issueCount = snapshot.data ?? 0;
+                                  return Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      _buildLabeledButton(
+                                        'Issues',
+                                        Icons.report_problem_outlined,
+                                        issueCount > 0
+                                            ? Colors.red
+                                            : Colors.grey,
+                                        () => _navigateToEquipmentIssues(
+                                          context,
+                                          equipmentId,
+                                          name,
+                                        ),
+                                        buttonPadding,
+                                        iconSize,
+                                        buttonLabelSize,
+                                      ),
+                                      if (issueCount > 0)
+                                        Positioned(
+                                          right: -4,
+                                          top: -4,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red,
+                                              shape: BoxShape.circle,
                                             ),
-                                            textAlign: TextAlign.center,
+                                            constraints: const BoxConstraints(
+                                              minWidth: 16,
+                                              minHeight: 16,
+                                            ),
+                                            child: Text(
+                                              '$issueCount',
+                                              style: GoogleFonts.poppins(
+                                                color: Colors.white,
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                  ],
-                                );
-                              },
-                            ),
-                            _buildLabeledButton(
-                              'Edit',
-                              Icons.edit,
-                              Colors.orange,
-                              onEdit,
-                              buttonPadding,
-                              iconSize,
-                              buttonLabelSize,
-                            ),
-                            _buildLabeledButton(
-                              'More',
-                              Icons.more_vert,
-                              Colors.grey[600]!,
-                              () => _showOptionsMenu(context),
-                              buttonPadding,
-                              iconSize,
-                              buttonLabelSize,
-                            ),
-                          ],
-                        ),
+                                    ],
+                                  );
+                                },
+                              ),
+                              _buildLabeledButton(
+                                'Edit',
+                                Icons.edit,
+                                Colors.orange,
+                                onEdit,
+                                buttonPadding,
+                                iconSize,
+                                buttonLabelSize,
+                              ),
+                              _buildLabeledButton(
+                                'More',
+                                Icons.more_vert,
+                                Colors.grey[600]!,
+                                () => _showOptionsMenu(context),
+                                buttonPadding,
+                                iconSize,
+                                buttonLabelSize,
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -501,17 +324,23 @@ Future<int> _getIssueCount(int equipmentId) async {
       ),
     );
   }
-void _navigateToEquipmentIssues(BuildContext context, int equipmentId, String equipmentName) {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => EquipmentIssuesPage(
-        equipmentId: equipmentId,
-        equipmentName: equipmentName,
+
+  void _navigateToEquipmentIssues(
+    BuildContext context,
+    int equipmentId,
+    String equipmentName,
+  ) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EquipmentIssuesPage(
+          equipmentId: equipmentId,
+          equipmentName: equipmentName,
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
+
   Widget _buildLabeledButton(
     String label,
     IconData icon,
@@ -568,7 +397,9 @@ void _navigateToEquipmentIssues(BuildContext context, int equipmentId, String eq
     final imageSize = isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0);
     final nameFontSize = isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0);
     final brandFontSize = isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0);
-    final categoryFontSize = isSmallScreen ? 10.0 : (isMediumScreen ? 11.0 : 12.0);
+    final categoryFontSize = isSmallScreen
+        ? 10.0
+        : (isMediumScreen ? 11.0 : 12.0);
     final descriptionFontSize = isSmallScreen ? 11.0 : 12.0;
     final statusFontSize = isSmallScreen ? 10.0 : 12.0;
     final statusIconSize = isSmallScreen ? 12.0 : 14.0;
@@ -642,7 +473,11 @@ void _navigateToEquipmentIssues(BuildContext context, int equipmentId, String eq
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(statusIcon, color: statusColor, size: statusIconSize),
+                                Icon(
+                                  statusIcon,
+                                  color: statusColor,
+                                  size: statusIconSize,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   _getStatusText(status),
@@ -889,200 +724,224 @@ void _navigateToEquipmentIssues(BuildContext context, int equipmentId, String eq
   }
 
   void _showQRCode(
-  BuildContext context,
-  int equipmentId,
-  String equipmentName,
-) {
-  // ✅ FIX: Use the actual QR code from the database
-  final qrCode = equipment['qr_code'] ?? 'UNKNOWN-${equipmentId.toString().padLeft(3, '0')}';
+    BuildContext context,
+    int equipmentId,
+    String equipmentName,
+  ) {
+    // ✅ FIX: Use the actual QR code from the database
+    final qrCode =
+        equipment['qr_code'] ??
+        'UNKNOWN-${equipmentId.toString().padLeft(3, '0')}';
 
-  final screenWidth = MediaQuery.of(context).size.width;
-  final isSmallScreen = screenWidth < 600;
-  final dialogWidth = isSmallScreen ? screenWidth * 0.9 : 400.0;
-  final qrSize = isSmallScreen ? 200.0 : 240.0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 600;
+    final dialogWidth = isSmallScreen ? screenWidth * 0.9 : 400.0;
+    final qrSize = isSmallScreen ? 200.0 : 240.0;
 
-  showDialog(
-  context: context,
-  builder: (context) => Dialog(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    child: Container(
-      width: dialogWidth,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85, // Add max height
-      ),
-      padding: const EdgeInsets.all(24),
-      child: SingleChildScrollView( // ✅ Add scroll capability
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header with icon
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2B326B).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.qr_code_2,
-                color: Color(0xFF2B326B),
-                size: 32,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Title
-            Text(
-              'Equipment QR Code',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF2B326B),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // QR Code Number
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFC107).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFFFC107)),
-              ),
-              child: Text(
-                qrCode,
-                style: GoogleFonts.robotoMono(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF2B326B),
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // QR Code with styled container
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey[300]!, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: QrImageView(
-                data: qrCode,
-                version: QrVersions.auto,
-                size: qrSize,
-                backgroundColor: Colors.white,
-                errorCorrectionLevel: QrErrorCorrectLevel.H,
-                gapless: true,
-                eyeStyle: const QrEyeStyle(
-                  eyeShape: QrEyeShape.square,
-                  color: Color(0xFF2B326B),
-                ),
-                dataModuleStyle: const QrDataModuleStyle(
-                  dataModuleShape: QrDataModuleShape.square,
-                  color: Color(0xFF2B326B),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Equipment Info
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildInfoRow('Name:', equipmentName),
-                  const SizedBox(height: 8),
-                  _buildInfoRow('Brand:', equipment['brand'] ?? 'N/A'),
-                  const SizedBox(height: 8),
-                  _buildInfoRow('Category:', equipment['category'] ?? 'N/A'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Close Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2B326B),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          width: dialogWidth,
+          constraints: BoxConstraints(
+            maxHeight:
+                MediaQuery.of(context).size.height * 0.85, // Add max height
+          ),
+          padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            // ✅ Add scroll capability
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with icon
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2B326B).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-                child: Text(
-                  'Close',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                  child: const Icon(
+                    Icons.qr_code_2,
+                    color: Color(0xFF2B326B),
+                    size: 32,
                   ),
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  ),
-);
-}
+                const SizedBox(height: 16),
 
-// Helper method for info rows
-Widget _buildInfoRow(String label, String value) {
-  return Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        label,
-        style: GoogleFonts.poppins(
-          fontSize: 13,
-          color: Colors.grey[600],
-          fontWeight: FontWeight.w500,
+                // Title
+                Text(
+                  'Equipment QR Code',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF2B326B),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // QR Code Number
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFC107).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFFFC107)),
+                  ),
+                  child: Text(
+                    qrCode,
+                    style: GoogleFonts.robotoMono(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF2B326B),
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // QR Code with styled container
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey[300]!, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: QrImageView(
+                    data: qrCode,
+                    version: QrVersions.auto,
+                    size: qrSize,
+                    backgroundColor: Colors.white,
+                    errorCorrectionLevel: QrErrorCorrectLevel.H,
+                    gapless: true,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: Color(0xFF2B326B),
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: Color(0xFF2B326B),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Equipment Info
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildInfoRow('Name:', equipmentName),
+                      const SizedBox(height: 8),
+                      _buildInfoRow('Brand:', equipment['brand'] ?? 'N/A'),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        'Category:',
+                        equipment['category'] ?? 'N/A',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Close Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2B326B),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Close',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Text(
-          value,
+    );
+  }
+
+  // Helper method for info rows
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
           style: GoogleFonts.poppins(
             fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
           ),
-          textAlign: TextAlign.end,
         ),
-      ),
-    ],
-  );
-}
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+            textAlign: TextAlign.end,
+          ),
+        ),
+      ],
+    );
+  }
 
   void _showOptionsMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => Container(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+
             Text(
               'Equipment Options',
               style: GoogleFonts.poppins(
@@ -1115,21 +974,124 @@ Widget _buildInfoRow(String label, String value) {
               onStatusChange('retired');
             }),
 
-            const Divider(),
+            const Divider(thickness: 1, height: 32),
 
             _buildOptionItem(Icons.edit, 'Edit Equipment', Colors.blue, () {
               Navigator.pop(context);
               onEdit();
             }),
-            _buildOptionItem(Icons.delete, 'Delete Equipment', Colors.red, () {
-              Navigator.pop(context);
-              _deleteEquipment(context);
-            }),
+            _buildOptionItem(
+              Icons.delete,
+              'Delete Equipment',
+              Colors.red,
+              () async {
+                print('🔴 Delete Equipment tapped'); // Debug print
+                Navigator.pop(context); // Close the options menu first
+                await _handleEquipmentDeletion(
+                  context,
+                ); // Make sure this is called
+              },
+            ),
+
+            // Add some bottom padding for better UX
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
           ],
         ),
       ),
     );
   }
+
+  Future<void> _handleEquipmentDeletion(BuildContext context) async {
+    final equipmentId = equipment['equipment_id'];
+    final equipmentName = equipment['name'] ?? 'this equipment';
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red[700], size: 28),
+            const SizedBox(width: 12),
+            Text(
+              'Delete Equipment',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete "$equipmentName"?\n\nThis action cannot be undone.',
+          style: GoogleFonts.poppins(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      // Delete the equipment using the service
+      await EquipmentManagementService.deleteEquipment(equipmentId);
+
+      // Refresh the list
+      onRefresh();
+
+      // Show success message via callback
+      onShowMessage?.call(
+        'Equipment "$equipmentName" deleted successfully!',
+        true,
+      );
+    } catch (e) {
+      // Clean up the error message
+      String errorMessage = e.toString();
+
+      // Remove "Exception: " prefix if it exists
+      if (errorMessage.startsWith('Exception: ')) {
+        errorMessage = errorMessage.substring(11);
+      }
+
+      // Remove any other technical prefixes
+      if (errorMessage.toLowerCase().contains('postgrestexception')) {
+        errorMessage =
+            'Unable to delete this equipment due to database constraints. Please contact support.';
+      }
+
+      // Show error message via callback
+      onShowMessage?.call(errorMessage, false);
+    }
+  }
+
   Widget _buildOptionItem(
     IconData icon,
     String title,
