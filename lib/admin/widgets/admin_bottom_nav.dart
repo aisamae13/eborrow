@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salomon_bottom_bar/salomon_bottom_bar.dart';
 import '../pages/admin_dashboard.dart';
 import '../pages/requests_management_page.dart';
 import '../pages/equipment_management_page.dart';
@@ -39,31 +40,38 @@ class _AdminBottomNavState extends State<AdminBottomNav> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
+      bottomNavigationBar: SalomonBottomBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         selectedItemColor: const Color(0xFF2B326B),
         unselectedItemColor: Colors.grey,
-        selectedFontSize: 12,
-        unselectedFontSize: 11,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.assignment),
-            label: 'Requests',
+        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        itemPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        items: [
+          SalomonBottomBarItem(
+            icon: const Icon(Icons.home),
+            title: const Text('Home'),
+            selectedColor: const Color(0xFF2B326B),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2),
-            label: 'Equipment',
+          SalomonBottomBarItem(
+            icon: const Icon(Icons.assignment),
+            title: const Text('Requests'),
+            selectedColor: const Color(0xFF2B326B),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.report_problem),
-            label: 'Issues',
+          SalomonBottomBarItem(
+            icon: const Icon(Icons.inventory_2),
+            title: const Text('Equipment'),
+            selectedColor: const Color(0xFF2B326B),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people),
-            label: 'Users',
+          SalomonBottomBarItem(
+            icon: const Icon(Icons.report_problem),
+            title: const Text('Issues'),
+            selectedColor: const Color(0xFF2B326B),
+          ),
+          SalomonBottomBarItem(
+            icon: const Icon(Icons.people),
+            title: const Text('Users'),
+            selectedColor: const Color(0xFF2B326B),
           ),
         ],
       ),

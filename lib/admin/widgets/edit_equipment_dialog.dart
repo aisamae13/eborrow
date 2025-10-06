@@ -762,7 +762,7 @@ class _EditEquipmentDialogState extends State<EditEquipmentDialog> {
                                   ),
                                 )
                               : Text(
-                                  'Update Equipment',
+                                  'Update',
                                   style: GoogleFonts.poppins(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 12, // 🔧 FIXED: Smaller font for Update Equipment
@@ -807,8 +807,8 @@ class _EditEquipmentDialogState extends State<EditEquipmentDialog> {
                                 icon: const Icon(Icons.photo_library, size: 16), // 🔧 FIXED: Smaller icon
                                 label: Flexible( // 🔧 FIXED: Wrap with Flexible to prevent overflow
                                   child: Text(
-                                    (_pickedImage != null || _existingImageUrl != null) 
-                                        ? 'Change Image' 
+                                    (_pickedImage != null || _existingImageUrl != null)
+                                        ? 'Change Image'
                                         : 'Pick Image',
                                     style: const TextStyle(fontSize: 8), // 🔧 FIXED: Smaller font
                                     overflow: TextOverflow.ellipsis,
@@ -872,8 +872,8 @@ class _EditEquipmentDialogState extends State<EditEquipmentDialog> {
     if (!_formKey.currentState!.validate()) return;
 
     // FIXED CHANGE DETECTION: Check ALL fields
-    final hasImageChange = _pickedImage != null || 
-        (widget.equipment['image_url'] != null && _existingImageUrl == null) || 
+    final hasImageChange = _pickedImage != null ||
+        (widget.equipment['image_url'] != null && _existingImageUrl == null) ||
         (widget.equipment['image_url'] == null && _existingImageUrl != null);
 
     // Get original specifications as string for comparison

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salomon_bottom_bar/salomon_bottom_bar.dart';
 import '../borrower/pages/homepage.dart';
 import '../borrower/pages/catalogpage.dart';
 import '../borrower/pages/scanqr.dart';
@@ -13,28 +14,22 @@ class BottomNav extends StatefulWidget {
 }
 
 class _BottomNavState extends State<BottomNav> {
-  int _selectedIndex = 0; // Tracks the currently selected tab index
+  int _selectedIndex = 0;
 
-  // This list holds the widgets for each tab's content.
-  // We use `late final` because it's initialized in `initState`.
   late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
-    // Initialize the list of pages. We need to do this here because we're passing
-    // a function to HomePage that depends on `this`.
     _pages = [
-      // Pass the navigation function to HomePage to allow it to change the tab.
       HomePage(onNavigate: _onItemTapped),
       const CatalogPage(),
       const ScanQRPage(),
-      const HistoryPage(),
       const ActiveBorrowingsPage(),
+      const HistoryPage(),
     ];
   }
 
-  // This function is called when a tab is tapped, updating the selected index.
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -43,34 +38,41 @@ class _BottomNavState extends State<BottomNav> {
 
   @override
   Widget build(BuildContext context) {
-    // We now return a Scaffold without an AppBar. Each page will have its own header.
     return Scaffold(
       body: _pages[_selectedIndex],
-
-      // The bottom navigation bar is part of the main Scaffold
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2_outlined),
-            label: 'Catalog',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.qr_code_scanner),
-            label: 'Scan QR',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Items'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.assignment_outlined),
-            activeIcon: Icon(Icons.assignment),
-            label: 'Borrowings',
-          ),
-        ],
-        currentIndex: _selectedIndex, // Set the current index
+      bottomNavigationBar: SalomonBottomBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
         selectedItemColor: const Color(0xFF4A55A2),
         unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped, // Call the function when a tab is tapped
+        items: [
+          SalomonBottomBarItem(
+            icon: const Icon(Icons.home),
+            title: const Text('Home'),
+            selectedColor: const Color(0xFF4A55A2),
+          ),
+          SalomonBottomBarItem(
+            icon: const Icon(Icons.inventory_2_outlined),
+            title: const Text('Catalog'),
+            selectedColor: const Color(0xFF4A55A2),
+          ),
+          SalomonBottomBarItem(
+            icon: const Icon(Icons.qr_code_scanner),
+            title: const Text('Scan QR'),
+            selectedColor: const Color(0xFF4A55A2),
+          ),
+          SalomonBottomBarItem(
+            icon: const Icon(Icons.assignment_outlined),
+            activeIcon: const Icon(Icons.assignment),
+            title: const Text('Active'),
+            selectedColor: const Color(0xFF4A55A2),
+          ),
+          SalomonBottomBarItem(
+            icon: const Icon(Icons.history),
+            title: const Text('History'),
+            selectedColor: const Color(0xFF4A55A2),
+          ),
+        ],
       ),
     );
   }
