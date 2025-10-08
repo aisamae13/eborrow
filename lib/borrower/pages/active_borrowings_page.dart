@@ -1,3 +1,4 @@
+import 'package:eborrow/admin/widgets/borrow_countdown_timer.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +8,7 @@ import 'package:eborrow/shared/utils/string_extension.dart';
 import 'modify_request_page.dart';
 import 'request_detail_popup.dart';
 import '../../shared/notifications/notification_service.dart';
+
 
 class ActiveBorrowingsPage extends StatefulWidget {
   const ActiveBorrowingsPage({super.key});
@@ -652,6 +654,22 @@ Widget _buildBorrowedItemCard(BorrowRequest item) {
                       const SizedBox(height: 8),
                     ],
 
+                    // ← ADD THE COUNTDOWN TIMER HERE
+                    if (['approved','active'].contains(item.status.toLowerCase())) ...[
+                      const SizedBox(height: 8),
+                      BorrowCountdownTimer(
+                        borrowDate: item.borrowDate,
+                        returnDate: item.returnDate,
+                        compact: false,
+                        onFinished: () {
+                          // Optional: pwede kang mag-refresh kapag lumipas na ang return date
+                          setState(() { 
+                            _requestsFuture = _fetchActiveRequests(); 
+                          });
+                        },
+                      ),
+                    ],
+
                     // FIX: Requested date with proper overflow handling
                     Row(
                       children: [
@@ -746,9 +764,9 @@ Widget _buildBorrowedItemCard(BorrowRequest item) {
           ],
         ],
       ),
-    ),
+    )
   );
-}
+  }
 
   // Helper methods
   String _getStatusDescription(String status, BorrowRequest item) {

@@ -224,6 +224,28 @@ class _BorrowRequestPageState extends State<BorrowRequestPage> {
         throw 'User is not logged in.';
       }
 
+      // ✅ ADD: Check current active requests before submitting
+      final activeRequests = await supabase
+          .from('borrow_requests')
+          .select('request_id')
+          .eq('borrower_id', userId)
+          .inFilter('status', ['pending', 'approved', 'active']);
+
+      if (activeRequests.length >= 5) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'You have reached the maximum limit of 5 concurrent borrow requests. Please wait for some to be completed.',
+              ),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
       // 1. INSERT THE REQUEST. THE DATABASE TRIGGER HANDLES THE NOTIFICATION.
       final response = await supabase
           .from('borrow_requests')
@@ -236,11 +258,7 @@ class _BorrowRequestPageState extends State<BorrowRequestPage> {
             'purpose': _purposeController.text.trim(),
           })
           .select('*, equipment(name)')
-          .single(); // <-- Chained .select().single()
-
-      // ⚠️ Tiningnan ko ang code, at walang tawag sa NotificationService dito.
-      // Ang logic ay MALINIS na at dapat gumawa lang ng ISANG notification
-      // (yung galing sa trigger)
+          .single();
 
       if (mounted) {
         // Create a BorrowRequest object from the response
@@ -255,10 +273,20 @@ class _BorrowRequestPageState extends State<BorrowRequestPage> {
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = 'Error submitting request: ${e.toString()}';
+
+        // ✅ ADD: Better error handling for specific cases
+        if (e.toString().contains('maximum limit of 5 concurrent')) {
+          errorMessage = 'You can only have 5 active requests at a time. Please wait for some to be completed.';
+        } else if (e.toString().contains('student_id')) {
+          errorMessage = 'Please add your Student ID to your profile first.';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error submitting request: ${e.toString()}'),
+            content: Text(errorMessage),
             backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 4),
           ),
         );
       }

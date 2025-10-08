@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../services/request_management_service.dart';
 import '../../main.dart';
+import '../widgets/borrow_countdown_timer.dart'; // <-- ADD THIS
 
 class RequestsManagementPage extends StatefulWidget {
   const RequestsManagementPage({super.key});
@@ -597,6 +598,17 @@ class RequestCard extends StatelessWidget {
               ],
             ),
           ),
+          if (['approved','active','overdue'].contains(status.toLowerCase())) ...[
+            const SizedBox(height: 12),
+            BorrowCountdownTimer(
+              borrowDate: borrowDate.toLocal(),
+              returnDate: returnDate.toLocal(),
+              compact: true,
+              onFinished: () {
+                onLocalRefresh();
+              },
+            ),
+          ],
           if (purpose.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
