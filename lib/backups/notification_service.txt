@@ -11,6 +11,7 @@ enum NotificationType {
   requestRejected,
   equipmentOverdue,
   equipmentReturned,
+  returnReminder, // 🆕 NEW: For local return reminders
   general
 }
 
@@ -22,6 +23,7 @@ class NotificationItem {
   final DateTime timestamp;
   final bool isRead;
   final Map<String, dynamic>? metadata;
+  final bool isLocal; // 🆕 NEW: Flag for local notifications
 
   NotificationItem({
     required this.id,
@@ -31,6 +33,7 @@ class NotificationItem {
     required this.timestamp,
     this.isRead = false,
     this.metadata,
+    this.isLocal = false, // 🆕 NEW: Default to false for DB notifications
   });
 
   factory NotificationItem.fromMap(Map<String, dynamic> map) {
@@ -48,6 +51,27 @@ class NotificationItem {
       timestamp: DateTime.parse(map['created_at']).toLocal(),
       isRead: map['is_read'] == true,
       metadata: map['metadata'],
+      isLocal: false, // DB notifications are never local
+    );
+  }
+
+  // 🆕 NEW: Factory for local notifications
+  factory NotificationItem.local({
+    required String id,
+    required String title,
+    required String message,
+    required NotificationType type,
+    Map<String, dynamic>? metadata,
+  }) {
+    return NotificationItem(
+      id: id,
+      title: title,
+      message: message,
+      type: type,
+      timestamp: DateTime.now(),
+      isRead: false,
+      metadata: metadata,
+      isLocal: true,
     );
   }
 
@@ -59,6 +83,7 @@ class NotificationItem {
     DateTime? timestamp,
     bool? isRead,
     Map<String, dynamic>? metadata,
+    bool? isLocal,
   }) {
     return NotificationItem(
       id: id ?? this.id,
@@ -68,6 +93,7 @@ class NotificationItem {
       timestamp: timestamp ?? this.timestamp,
       isRead: isRead ?? this.isRead,
       metadata: metadata ?? this.metadata,
+      isLocal: isLocal ?? this.isLocal,
     );
   }
 
@@ -83,6 +109,8 @@ class NotificationItem {
         return Icons.warning;
       case NotificationType.equipmentReturned:
         return Icons.done_all;
+      case NotificationType.returnReminder: // 🆕 NEW
+        return Icons.schedule;
       case NotificationType.general:
         return Icons.info;
     }
@@ -97,29 +125,171 @@ class NotificationItem {
       case NotificationType.requestRejected:
         return Colors.red;
       case NotificationType.equipmentOverdue:
-        return Colors.orange;
+        return Colors.red;
       case NotificationType.equipmentReturned:
         return Colors.blue;
+      case NotificationType.returnReminder: // 🆕 NEW
+        return Colors.orange;
       case NotificationType.general:
         return Colors.grey;
     }
   }
 }
 
-// Real-time Notification Provider
+// 🆕 NEW: Local Return Reminder Service
+class LocalReminderService {
+  static Timer? _reminderTimer;
+  static final Map<String, Timer> _activeReminders = {};
+  static NotificationProvider? _notificationProvider;
+
+  static void initialize(NotificationProvider provider) {
+    _notificationProvider = provider;
+    _startMonitoring();
+  }
+
+  static void dispose() {
+    _reminderTimer?.cancel();
+    _clearAllReminders();
+  }
+
+  static void _startMonitoring() {
+    // Check for reminders every minute
+    _reminderTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _checkForReminders();
+    });
+    debugPrint('🔔 Local reminder monitoring started');
+  }
+
+  static Future<void> _checkForReminders() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      // Fetch active borrowings
+      final response = await supabase
+          .from('borrow_requests')
+          .select('request_id, return_date, equipment(name)')
+          .eq('borrower_id', userId)
+          .inFilter('status', ['active'])
+          .order('return_date', ascending: true);
+
+      final now = DateTime.now();
+      
+      for (final request in response) {
+        final requestId = request['request_id'].toString();
+        final returnDate = DateTime.parse(request['return_date']);
+        final equipmentName = request['equipment']['name'] ?? 'Equipment';
+        
+        final minutesUntilDue = returnDate.difference(now).inMinutes;
+        
+        // Schedule 15-minute reminder
+        if (minutesUntilDue <= 15 && minutesUntilDue > 5) {
+          _scheduleReminder(
+            requestId: requestId,
+            equipmentName: equipmentName,
+            minutesRemaining: minutesUntilDue,
+            isUrgent: false,
+          );
+        }
+        // Schedule 5-minute urgent reminder
+        else if (minutesUntilDue <= 5 && minutesUntilDue > 0) {
+          _scheduleReminder(
+            requestId: requestId,
+            equipmentName: equipmentName,
+            minutesRemaining: minutesUntilDue,
+            isUrgent: true,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error checking for reminders: $e');
+    }
+  }
+
+  static void _scheduleReminder({
+    required String requestId,
+    required String equipmentName,
+    required int minutesRemaining,
+    required bool isUrgent,
+  }) {
+    final reminderId = '${requestId}_${isUrgent ? '5min' : '15min'}';
+    
+    // Don't schedule if already scheduled
+    if (_activeReminders.containsKey(reminderId)) return;
+
+    debugPrint('🔔 Scheduling ${isUrgent ? 'urgent' : 'regular'} reminder for $equipmentName');
+
+    // Create and add local notification immediately
+    final notification = NotificationItem.local(
+      id: 'reminder_$reminderId',
+      title: isUrgent ? '⚠️ Return Due Soon!' : '⏰ Return Reminder',
+      message: isUrgent 
+          ? 'Your borrowed "$equipmentName" is due in $minutesRemaining minutes. Please return it immediately!'
+          : 'Your borrowed "$equipmentName" is due in $minutesRemaining minutes. Start preparing to return it.',
+      type: NotificationType.returnReminder,
+      metadata: {
+        'equipment_name': equipmentName,
+        'request_id': requestId,
+        'minutes_remaining': minutesRemaining,
+        'is_urgent': isUrgent,
+      },
+    );
+
+    _notificationProvider?.addLocalNotification(notification);
+
+    // Set timer to clean up after 5 minutes
+    _activeReminders[reminderId] = Timer(const Duration(minutes: 5), () {
+      _activeReminders.remove(reminderId);
+    });
+  }
+
+  static void _clearAllReminders() {
+    for (final timer in _activeReminders.values) {
+      timer.cancel();
+    }
+    _activeReminders.clear();
+  }
+
+  static void cancelRemindersForRequest(String requestId) {
+    final keysToRemove = _activeReminders.keys
+        .where((key) => key.startsWith(requestId))
+        .toList();
+    
+    for (final key in keysToRemove) {
+      _activeReminders[key]?.cancel();
+      _activeReminders.remove(key);
+    }
+    debugPrint('🔕 Cancelled reminders for request $requestId');
+  }
+}
+
+// Enhanced Real-time Notification Provider
 class NotificationProvider extends ChangeNotifier {
   List<NotificationItem> _notifications = [];
   int _unreadCount = 0;
   bool _isLoading = false;
   RealtimeChannel? _subscription;
+  String? _currentUserId; // 🆕 NEW: Track current user ID
 
   List<NotificationItem> get notifications => _notifications;
   int get unreadCount => _unreadCount;
   bool get isLoading => _isLoading;
 
   void initializeRealtime(String userId) {
+    // 🚀 NEW: Only reinitialize if user has changed
+    if (_currentUserId == userId && _subscription != null) {
+      debugPrint('📋 User unchanged ($userId), skipping reinitialization');
+      return;
+    }
+
+    debugPrint('🔄 Initializing notifications for user: $userId (previous: $_currentUserId)');
+    _currentUserId = userId;
+    
     _subscription?.unsubscribe();
     loadNotifications(userId); // Load initial data
+    
+    // 🆕 NEW: Initialize local reminder service
+    LocalReminderService.initialize(this);
 
     try {
       // 🚀 EFFICIENCY FIX: Filter real-time events by user_id to reduce traffic and processing.
@@ -156,6 +326,35 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
+  // 🆕 NEW: Clear notifications method for account switching
+  void clearNotifications() {
+    debugPrint('🧹 Clearing all notifications');
+    _subscription?.unsubscribe();
+    _subscription = null;
+    _currentUserId = null;
+    _notifications.clear();
+    _unreadCount = 0;
+    _isLoading = false;
+    LocalReminderService.dispose();
+    notifyListeners();
+  }
+
+  // 🆕 NEW: Add local notification method
+  void addLocalNotification(NotificationItem notification) {
+    // Check if similar notification already exists
+    final exists = _notifications.any((n) => 
+        n.isLocal && 
+        n.metadata?['request_id'] == notification.metadata?['request_id'] &&
+        n.metadata?['is_urgent'] == notification.metadata?['is_urgent']
+    );
+
+    if (!exists) {
+      _notifications.insert(0, notification);
+      _unreadCount++;
+      debugPrint('🔔 Added local notification: ${notification.title}');
+      notifyListeners();
+    }
+  }
 
   void _handleNewNotification(PostgresChangePayload payload) {
     debugPrint('🆕 New notification received: ${payload.newRecord}');
@@ -219,16 +418,21 @@ class NotificationProvider extends ChangeNotifier {
 
       debugPrint('📦 Raw response from Supabase: $response');
 
-      // 3. Fast local processing
-      _notifications = (response as List)
+      // 3. Fast local processing - keep local notifications at top
+      final dbNotifications = (response as List)
           .map((map) => NotificationItem.fromMap(map))
           .toList();
+      
+      // Merge with existing local notifications
+      final localNotifications = _notifications.where((n) => n.isLocal).toList();
+      _notifications = [...localNotifications, ...dbNotifications];
+      
       _unreadCount = _notifications.where((n) => !n.isRead).length;
 
       debugPrint('✅ Loaded ${_notifications.length} notifications, $_unreadCount unread');
       debugPrint('📋 Notification details:');
       for (var n in _notifications) {
-        debugPrint('   - ${n.title}: isRead=${n.isRead}, id=${n.id}');
+        debugPrint('   - ${n.title}: isRead=${n.isRead}, id=${n.id}, isLocal=${n.isLocal}');
       }
     } catch (e) {
       debugPrint('❌ Error loading notifications: $e');
@@ -240,6 +444,22 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> markAsRead(String notificationId) async {
+    // Handle local notifications differently
+    final notification = _notifications.firstWhere((n) => n.id == notificationId);
+    
+    if (notification.isLocal) {
+      // For local notifications, just update the local state
+      final index = _notifications.indexWhere((n) => n.id == notificationId);
+      if (index != -1 && !_notifications[index].isRead) {
+        _notifications[index] = _notifications[index].copyWith(isRead: true);
+        _unreadCount = (_unreadCount - 1).clamp(0, double.infinity).toInt();
+        debugPrint('✅ Marked local notification as read - New unread count: $_unreadCount');
+        notifyListeners();
+      }
+      return;
+    }
+
+    // Handle database notifications as before
     try {
       debugPrint('🔵 Attempting to mark notification $notificationId as read');
 
@@ -286,6 +506,7 @@ class NotificationProvider extends ChangeNotifier {
     try {
       debugPrint('🔵 Marking all notifications as read for user: $userId');
 
+      // Mark all database notifications as read
       final response = await supabase
           .from('notifications')
           .update({'is_read': true})
@@ -295,6 +516,7 @@ class NotificationProvider extends ChangeNotifier {
 
       debugPrint('✅ Marked all notifications as read: ${response.length} updated');
 
+      // Update local state for all notifications (including local ones)
       _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
       _unreadCount = 0;
       notifyListeners();
@@ -307,6 +529,7 @@ class NotificationProvider extends ChangeNotifier {
   @override
   void dispose() {
     _subscription?.unsubscribe();
+    LocalReminderService.dispose(); // 🆕 NEW: Clean up reminder service
     super.dispose();
   }
 }

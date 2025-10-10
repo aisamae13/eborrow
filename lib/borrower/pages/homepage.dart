@@ -24,7 +24,7 @@ class _HomePageState extends State<HomePage> {
   late final Future<List<EquipmentCategory>> _categoriesFuture;
   bool _showStudentIdBanner = false;
   bool _isCategoriesExpanded = false;
-Map<String, dynamic>? _profileData; // Add this line
+  Map<String, dynamic>? _profileData;
 
   @override
   void initState() {
@@ -45,99 +45,105 @@ Map<String, dynamic>? _profileData; // Add this line
     }
   }
 
-Future<void> _loadUserDataAndCheckProfile() async {
-  final user = supabase.auth.currentUser;
-  if (user == null) return;
+  Future<void> _loadUserDataAndCheckProfile() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
 
-  // Set Display Name
-  final name =
-      user.userMetadata?['first_name'] ?? user.userMetadata?['full_name'];
-  if (name != null) {
-    setState(() {
-      _userName = name.split(' ')[0];
-    });
-  }
-
-  final providerName = user.appMetadata['provider']?.toString().toLowerCase();
-  final isGoogleUser = providerName == 'google' || providerName == 'gmail';
-
-  if (isGoogleUser) {
-    try {
-      final profile = await supabase
-          .from('user_profiles')
-          .select('student_id, avatar_url') // Add avatar_url here
-          .eq('id', user.id)
-          .single();
-
-      final studentId = profile['student_id'];
-
+    // Set Display Name
+    final name =
+        user.userMetadata?['first_name'] ?? user.userMetadata?['full_name'];
+    if (name != null) {
       setState(() {
-        _profileData = profile; // Store the profile data
-        if (studentId == null || (studentId is String && studentId.isEmpty)) {
-          _showStudentIdBanner = true;
-        }
+        _userName = name.split(' ')[0];
       });
+    }
 
-    } catch (e) {
-      debugPrint('❌ Profile Fetch Failure (Assuming ID is missing): $e');
-      if (mounted) {
+    final providerName = user.appMetadata['provider']?.toString().toLowerCase();
+    final isGoogleUser = providerName == 'google' || providerName == 'gmail';
+
+    if (isGoogleUser) {
+      try {
+        final profile = await supabase
+            .from('user_profiles')
+            .select('student_id, avatar_url')
+            .eq('id', user.id)
+            .single();
+
+        final studentId = profile['student_id'];
+
         setState(() {
-          _showStudentIdBanner = true;
+          _profileData = profile;
+          if (studentId == null || (studentId is String && studentId.isEmpty)) {
+            _showStudentIdBanner = true;
+          }
         });
+      } catch (e) {
+        debugPrint('❌ Profile Fetch Failure (Assuming ID is missing): $e');
+        if (mounted) {
+          setState(() {
+            _showStudentIdBanner = true;
+          });
+        }
       }
     }
   }
-}
-Widget _buildAvatarImage() {
-  // Try to get avatar from user profile data (if available)
-  final profileAvatarUrl = _profileData?['avatar_url'];
-  final googlePhotoUrl = supabase.auth.currentUser?.userMetadata?['avatar_url'];
 
-  final avatarUrl = profileAvatarUrl ?? googlePhotoUrl;
+  Widget _buildAvatarImage() {
+    final profileAvatarUrl = _profileData?['avatar_url'];
+    final googlePhotoUrl = supabase.auth.currentUser?.userMetadata?['avatar_url'];
+    final avatarUrl = profileAvatarUrl ?? googlePhotoUrl;
 
-  if (avatarUrl != null) {
-    return Image.network(
-      avatarUrl,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return Container(
-          color: Colors.white,
-          child: const Icon(
-            Icons.person,
-            color: Color(0xFF2B326B),
-            size: 20,
-          ),
-        );
-      },
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) return child;
-        return Container(
-          color: Colors.white,
-          child: const Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Color(0xFF2B326B),
+    return Container(
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+      ),
+      child: ClipOval(
+        child: avatarUrl != null
+            ? Image.network(
+                avatarUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.white,
+                    child: const Icon(
+                      Icons.person,
+                      color: Color(0xFF2B326B),
+                      size: 20,
+                    ),
+                  );
+                },
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    color: Colors.white,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF2B326B),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              )
+            : Container(
+                color: Colors.white,
+                child: const Icon(
+                  Icons.person,
+                  color: Color(0xFF2B326B),
+                  size: 20,
+                ),
               ),
-            ),
-          ),
-        );
-      },
+      ),
     );
   }
 
-  return Container(
-    color: Colors.white,
-    child: const Icon(
-      Icons.person,
-      color: Color(0xFF2B326B),
-      size: 20,
-    ),
-  );
-}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFEEF1F8), // 🎨 Neumorphism background
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text(
@@ -149,38 +155,81 @@ Widget _buildAvatarImage() {
           ),
         ),
         backgroundColor: const Color(0xFF2B326B),
+        elevation: 0,
         actions: [
-          RealtimeNotificationBadge(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const NotificationPage(),
+          // 🎨 Neumorphic Notification Badge Container
+          Container(
+            margin: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2B326B),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  offset: const Offset(2, 2),
+                  blurRadius: 4,
                 ),
-              );
-            },
-          ),
-          const SizedBox(width: 12),
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfilePage()),
-              );
-            },
-            child: Container(
-              margin: const EdgeInsets.only(right: 12),
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFFFFC107),
-                  width: 1,
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.1),
+                  offset: const Offset(-2, -2),
+                  blurRadius: 4,
                 ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: RealtimeNotificationBadge(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationPage(),
+                    ),
+                  );
+                },
               ),
-              child: ClipOval(
-                child: _buildAvatarImage(),
+            ),
+          ),
+          // 🎨 Neumorphic Profile Avatar Container
+          Container(
+            margin: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2B326B),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  offset: const Offset(2, 2),
+                  blurRadius: 4,
+                ),
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.1),
+                  offset: const Offset(-2, -2),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                );
+              },
+              child: Container(
+                width: 36,
+                height: 36,
+                margin: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFFFFC107),
+                    width: 2,
+                  ),
+                ),
+                child: ClipOval(
+                  child: _buildAvatarImage(),
+                ),
               ),
             ),
           ),
@@ -250,8 +299,7 @@ Widget _buildAvatarImage() {
                             .map((item) => Padding(
                                   padding: const EdgeInsets.only(bottom: 12.0),
                                   child: _buildNewEquipmentItem(item),
-                                ))
-                            ,
+                                )),
                         const SizedBox(height: 24),
                       ],
                     );
@@ -283,8 +331,7 @@ Widget _buildAvatarImage() {
                             .map((item) => Padding(
                                   padding: const EdgeInsets.only(bottom: 12.0),
                                   child: _buildRecentActivityItem(item),
-                                ))
-                            ,
+                                )),
                         const SizedBox(height: 24),
                       ],
                     );
@@ -298,38 +345,97 @@ Widget _buildAvatarImage() {
     );
   }
 
+  // 🎨 Neumorphic Student ID Banner
   Widget _buildStudentIdBanner() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       margin: const EdgeInsets.only(top: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFC107).withOpacity(0.2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFFC107)),
+        color: const Color(0xFFEEF1F8),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white,
+            offset: const Offset(-8, -8),
+            blurRadius: 15,
+            spreadRadius: 1,
+          ),
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            offset: const Offset(8, 8),
+            blurRadius: 15,
+            spreadRadius: 1,
+          ),
+        ],
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: Color(0xFFFFC107), size: 28),
-          const SizedBox(width: 12),
-          const Expanded(
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF1F8),
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.15),
+                  offset: const Offset(4, 4),
+                  blurRadius: 8,
+                ),
+                BoxShadow(
+                  color: Colors.white,
+                  offset: const Offset(-4, -4),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.info_outline,
+              color: Color(0xFFFFC107),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
             child: Text(
               'Please add your Student ID in your profile to borrow equipment.',
-              style: TextStyle(
-                color: Color(0xFF2B326B),
+              style: GoogleFonts.poppins(
+                color: const Color(0xFF2B326B),
                 fontWeight: FontWeight.w600,
+                fontSize: 14,
               ),
             ),
           ),
           const SizedBox(width: 8),
-          TextButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ProfilePage()),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF1F8),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.15),
+                  offset: const Offset(2, 2),
+                  blurRadius: 4,
+                ),
+                BoxShadow(
+                  color: Colors.white,
+                  offset: const Offset(-2, -2),
+                  blurRadius: 4,
+                ),
+              ],
             ),
-            child: const Text(
-              'Add ID',
-              style: TextStyle(color: Color(0xFF2B326B)),
+            child: TextButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+              ),
+              child: Text(
+                'Add ID',
+                style: GoogleFonts.poppins(
+                  color: const Color(0xFF2B326B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -337,11 +443,12 @@ Widget _buildAvatarImage() {
     );
   }
 
+  // 🎨 Neumorphic Welcome Card
   Widget _buildWelcomeCard(String? userName) {
     final displayName = userName ?? 'Welcome!';
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       margin: const EdgeInsets.only(top: 20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -349,12 +456,19 @@ Widget _buildAvatarImage() {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: Colors.grey.withOpacity(0.3),
+            offset: const Offset(8, 8),
+            blurRadius: 20,
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: Colors.white.withOpacity(0.8),
+            offset: const Offset(-8, -8),
+            blurRadius: 20,
+            spreadRadius: 2,
           ),
         ],
       ),
@@ -363,16 +477,19 @@ Widget _buildAvatarImage() {
         children: [
           Text(
             'Welcome, $displayName!',
-            style: const TextStyle(
-              fontSize: 24,
+            style: GoogleFonts.poppins(
+              fontSize: 26,
               fontWeight: FontWeight.bold,
-              color: Color(0xFFFFC107),
+              color: const Color(0xFFFFC107),
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Find and borrow any equipment easily',
-            style: TextStyle(fontSize: 16, color: Colors.white),
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              color: Colors.white.withOpacity(0.9),
+            ),
           ),
         ],
       ),
@@ -382,14 +499,15 @@ Widget _buildAvatarImage() {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: const TextStyle(
-        fontSize: 18,
+      style: GoogleFonts.poppins(
+        fontSize: 20,
         fontWeight: FontWeight.bold,
-        color: Colors.black87,
+        color: const Color(0xFF2B326B),
       ),
     );
   }
 
+  // 🎨 Neumorphic Quick Actions
   Widget _buildQuickActions(BuildContext context) {
     return Row(
       children: [
@@ -400,12 +518,11 @@ Widget _buildAvatarImage() {
               icon: Icons.qr_code_scanner,
               label: 'Scan QR',
               subtitle: 'Quick borrow',
-              color: Colors.green.shade100,
-              iconColor: Colors.green,
+              primaryColor: Colors.green,
             ),
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 20),
         Expanded(
           child: GestureDetector(
             onTap: () => widget.onNavigate(1),
@@ -413,8 +530,7 @@ Widget _buildAvatarImage() {
               icon: Icons.search,
               label: 'Browse',
               subtitle: 'View catalog',
-              color: Colors.yellow.shade100,
-              iconColor: Colors.yellow.shade800,
+              primaryColor: Colors.blue,
             ),
           ),
         ),
@@ -422,89 +538,428 @@ Widget _buildAvatarImage() {
     );
   }
 
+  // 🎨 Neumorphic Action Card
   Widget _buildActionCard({
     required IconData icon,
     required String label,
     required String subtitle,
-    required Color color,
-    required Color iconColor,
+    required Color primaryColor,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(15),
-         border: Border.all(
-        color: iconColor.withOpacity(0.5), // Use the darker color (iconColor) with some transparency
-        width: 1.5, // Increase width slightly for visibility
-      ),
+        color: const Color(0xFFEEF1F8),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white,
+            offset: const Offset(-8, -8),
+            blurRadius: 15,
+            spreadRadius: 1,
+          ),
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            offset: const Offset(8, 8),
+            blurRadius: 15,
+            spreadRadius: 1,
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 32, color: iconColor),
-          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF1F8),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.15),
+                  offset: const Offset(4, 4),
+                  blurRadius: 8,
+                ),
+                BoxShadow(
+                  color: Colors.white,
+                  offset: const Offset(-4, -4),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 32, color: primaryColor),
+          ),
+          const SizedBox(height: 16),
           Text(
             label,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: const Color(0xFF2B326B),
+            ),
           ),
-          Text(subtitle, style: TextStyle(color: Colors.grey[700])),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: GoogleFonts.poppins(
+              color: Colors.grey[600],
+              fontSize: 12,
+            ),
+          ),
         ],
       ),
     );
   }
 
- Widget _buildCategoryGrid(List<EquipmentCategory> categories) {
-  final displayedCategories = _isCategoriesExpanded
-      ? categories
-      : categories.take(4).toList();
-  final hasMore = categories.length > 4;
+  // 🎨 Neumorphic Category Grid
+  Widget _buildCategoryGrid(List<EquipmentCategory> categories) {
+    final displayedCategories = _isCategoriesExpanded
+        ? categories
+        : categories.take(4).toList();
+    final hasMore = categories.length > 4;
 
-  return Column(
-    children: [
-      Wrap(
-        spacing: 16,
-        runSpacing: 16,
-        children: displayedCategories
-            .map((category) => SizedBox(
-                  width: (MediaQuery.of(context).size.width - 48) / 2,
-                  height: 140,
-                  child: _buildCategoryCard(
-                    icon: _getIconForCategory(category.name),
-                    label: category.name,
-                    count: '${category.availableCount} available',
-                    color: _getColorForCategory(category.name).shade100,
-                    iconColor: _getColorForCategory(category.name).shade800,
-                  ),
-                ))
-            .toList(),
-      ),
-      if (hasMore) ...[
-        const SizedBox(height: 12),
-        TextButton.icon(
-          onPressed: () {
-            setState(() {
-              _isCategoriesExpanded = !_isCategoriesExpanded;
-            });
-          },
-          icon: Icon(
-            _isCategoriesExpanded
-                ? Icons.expand_less
-                : Icons.expand_more,
-            color: const Color(0xFF2B326B),
-          ),
-          label: Text(
-            _isCategoriesExpanded ? 'Show Less' : 'Show More',
-            style: const TextStyle(
-              color: Color(0xFF2B326B),
-              fontWeight: FontWeight.w600,
+    return Column(
+      children: [
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: displayedCategories
+              .map((category) => SizedBox(
+                    width: (MediaQuery.of(context).size.width - 48) / 2,
+                    height: 160,
+                    child: _buildCategoryCard(
+                      icon: _getIconForCategory(category.name),
+                      label: category.name,
+                      count: '${category.availableCount} available',
+                      color: _getColorForCategory(category.name),
+                    ),
+                  ))
+              .toList(),
+        ),
+        if (hasMore) ...[
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF1F8),
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.15),
+                  offset: const Offset(4, 4),
+                  blurRadius: 8,
+                ),
+                BoxShadow(
+                  color: Colors.white,
+                  offset: const Offset(-4, -4),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _isCategoriesExpanded = !_isCategoriesExpanded;
+                });
+              },
+              icon: Icon(
+                _isCategoriesExpanded
+                    ? Icons.expand_less
+                    : Icons.expand_more,
+                color: const Color(0xFF2B326B),
+              ),
+              label: Text(
+                _isCategoriesExpanded ? 'Show Less' : 'Show More',
+                style: GoogleFonts.poppins(
+                  color: const Color(0xFF2B326B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ],
-    ],
-  );
-}
+    );
+  }
+
+  // 🎨 Neumorphic Category Card - FIXED OVERFLOW
+  Widget _buildCategoryCard({
+    required IconData icon,
+    required String label,
+    required String count,
+    required MaterialColor color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16), // Reduced padding slightly
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF1F8),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white,
+            offset: const Offset(-6, -6),
+            blurRadius: 12,
+            spreadRadius: 1,
+          ),
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            offset: const Offset(6, 6),
+            blurRadius: 12,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF1F8),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.15),
+                  offset: const Offset(3, 3),
+                  blurRadius: 6,
+                ),
+                BoxShadow(
+                  color: Colors.white,
+                  offset: const Offset(-3, -3),
+                  blurRadius: 6,
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 24, color: color.shade700), // Slightly smaller icon
+          ),
+          const SizedBox(height: 10),
+          // 🔧 FIXED: Better text handling for long labels
+          Flexible(
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold,
+                fontSize: 13, // Slightly smaller font
+                color: const Color(0xFF2B326B),
+                height: 1.2, // Better line height
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2, // Allow 2 lines
+              overflow: TextOverflow.ellipsis, // Add ellipsis if still too long
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            count,
+            style: GoogleFonts.poppins(
+              color: Colors.grey[600],
+              fontSize: 10, // Slightly smaller
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🎨 Neumorphic New Equipment Item
+  Widget _buildNewEquipmentItem(NewEquipment item) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF1F8),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white,
+            offset: const Offset(-6, -6),
+            blurRadius: 12,
+            spreadRadius: 1,
+          ),
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            offset: const Offset(6, 6),
+            blurRadius: 12,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF1F8),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.15),
+                  offset: const Offset(3, 3),
+                  blurRadius: 6,
+                ),
+                BoxShadow(
+                  color: Colors.white,
+                  offset: const Offset(-3, -3),
+                  blurRadius: 6,
+                ),
+              ],
+            ),
+            child: Icon(Icons.new_releases, size: 24, color: Colors.green[700]),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: const Color(0xFF2B326B),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${item.brand} • ${item.category}',
+                  style: GoogleFonts.poppins(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF1F8),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.15),
+                  offset: const Offset(2, 2),
+                  blurRadius: 4,
+                ),
+                BoxShadow(
+                  color: Colors.white,
+                  offset: const Offset(-2, -2),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+            child: Text(
+              'New',
+              style: GoogleFonts.poppins(
+                color: Colors.green[700],
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🎨 Neumorphic Recent Activity Item
+  Widget _buildRecentActivityItem(BorrowRequest item) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF1F8),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white,
+            offset: const Offset(-6, -6),
+            blurRadius: 12,
+            spreadRadius: 1,
+          ),
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            offset: const Offset(6, 6),
+            blurRadius: 12,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF1F8),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.15),
+                  offset: const Offset(3, 3),
+                  blurRadius: 6,
+                ),
+                BoxShadow(
+                  color: Colors.white,
+                  offset: const Offset(-3, -3),
+                  blurRadius: 6,
+                ),
+              ],
+            ),
+            child: Icon(Icons.history_toggle_off, size: 24, color: Colors.grey[600]),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.equipmentName,
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: const Color(0xFF2B326B),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Status: ${item.formattedStatus}',
+                  style: GoogleFonts.poppins(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF1F8),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.15),
+                  offset: const Offset(2, 2),
+                  blurRadius: 4,
+                ),
+                BoxShadow(
+                  color: Colors.white,
+                  offset: const Offset(-2, -2),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+            child: Text(
+              item.formattedStatus,
+              style: GoogleFonts.poppins(
+                color: item.getStatusColor(),
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   IconData _getIconForCategory(String categoryName) {
     switch (categoryName) {
@@ -558,182 +1013,34 @@ Widget _buildAvatarImage() {
     }
   }
 
-  Widget _buildCategoryCard({
-    required IconData icon,
-    required String label,
-    required String count,
-    required Color color,
-    required Color iconColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(15),
-          border: Border.all(
-        color: iconColor.withOpacity(0.5),
-        width: 1.5,
-      ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 28, color: iconColor),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text(count, style: TextStyle(color: Colors.grey[700], fontSize: 12)),
-        ],
-      ),
-    );
+  Future<List<BorrowRequest>> _fetchRecentActivity() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) {
+      print('DEBUG: User ID is NULL. Cannot fetch activity.');
+      return [];
+    }
+    print('DEBUG: Fetching activity for User ID: $userId');
+
+    try {
+      final response = await supabase
+          .from('borrow_requests')
+          .select('*, equipment(name, brand, image_url)')
+          .eq('borrower_id', userId)
+          .order('created_at', ascending: false)
+          .limit(3);
+
+      print('DEBUG: Raw Response: $response');
+
+      final requests = response.map((map) => BorrowRequest.fromMap(map)).toList();
+      print('DEBUG: Parsed ${requests.length} requests');
+
+      return requests;
+    } catch (e, stackTrace) {
+      print('DEBUG: Fetch Error: $e');
+      print('DEBUG: Stack Trace: $stackTrace');
+      return [];
+    }
   }
-
-  Widget _buildNewEquipmentItem(NewEquipment item) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(Icons.new_releases, size: 28, color: Colors.green[700]),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  '${item.brand} • ${item.category}',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              'New',
-              style: TextStyle(
-                color: Colors.green[700],
-                fontWeight: FontWeight.bold,
-                fontSize: 11,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecentActivityItem(BorrowRequest item) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
- child: Row(
-      children: [
-        Icon(Icons.history_toggle_off, size: 36, color: Colors.grey[600]),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.equipmentName,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                'Status: ${item.formattedStatus}',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: item.getStatusColor().withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            item.formattedStatus,
-            style: TextStyle(
-              color: item.getStatusColor(),
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
- Future<List<BorrowRequest>> _fetchRecentActivity() async {
-  final userId = supabase.auth.currentUser?.id;
-  if (userId == null) {
-    print('DEBUG: User ID is NULL. Cannot fetch activity.');
-    return [];
-  }
-  print('DEBUG: Fetching activity for User ID: $userId');
-
-  try {
-    final response = await supabase
-        .from('borrow_requests')
-        .select('*, equipment(name, brand, image_url)')
-        .eq('borrower_id', userId)
-        .order('created_at', ascending: false)
-        .limit(3);
-
-    print('DEBUG: Raw Response: $response'); // ADD THIS to see actual data
-
-    final requests = response.map((map) => BorrowRequest.fromMap(map)).toList();
-    print('DEBUG: Parsed ${requests.length} requests'); // ADD THIS
-
-    return requests;
-  } catch (e, stackTrace) {
-    print('DEBUG: Fetch Error: $e');
-    print('DEBUG: Stack Trace: $stackTrace'); // ADD THIS to see where it fails
-    return [];
-  }
-}
 
   Future<List<NewEquipment>> _fetchNewEquipment() async {
     try {
@@ -792,20 +1099,12 @@ Widget _buildAvatarImage() {
   }
 
   @override
-  @override
   void dispose() {
-    // The issue is using 'context.read' (or Provider.of(context, listen: false))
-    // in dispose(), as the context might be deactivated.
-    // The recommended fix is to use a try-catch block to handle the exception gracefully,
-    // or, better, to restructure where the service is disposed if possible,
-    // but in a typical app structure, try-catch is the practical solution here.
     try {
       final notificationProvider = context.read<NotificationProvider>();
       notificationProvider.dispose();
     } on FlutterError {
       // Catch the "Looking up a deactivated widget's ancestor is unsafe" error
-      // which is thrown as a FlutterError.
-      // print('Provider lookup failed in dispose: $e'); // Optional: for debugging
     }
 
     super.dispose();

@@ -65,7 +65,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFE6E8F0), // 🎨 Neumorphic background
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Column(
@@ -150,32 +150,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
       body: RefreshIndicator(
         onRefresh: _refreshDashboard,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          physics: const AlwaysScrollableScrollPhysics(), // 🔧 Better scroll physics
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0), // 🔧 Optimized padding
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Welcome Card
-              _buildWelcomeCard(),
-              const SizedBox(height: 24),
-
               // Quick Actions
               Text(
                 'Quick Actions',
                 style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 22, // 🔧 Slightly larger for better hierarchy
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF2B326B),
+                  letterSpacing: -0.5, // 🔧 Better letter spacing
                 ),
               ),
               const SizedBox(height: 16),
               _buildQuickActions(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32), // 🔧 Better spacing
 
               // Overview Stats
               Text(
                 'Overview',
                 style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF2B326B),
+                  letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 16),
@@ -183,65 +184,89 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 future: _dashboardData,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6E8F0),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: const [
+                            // 🎨 Neumorphic loading indicator
+                            BoxShadow(
+                              color: Color(0xFFBCC0D0),
+                              offset: Offset(8, 8),
+                              blurRadius: 15,
+                              spreadRadius: 1,
+                            ),
+                            BoxShadow(
+                              color: Colors.white,
+                              offset: Offset(-8, -8),
+                              blurRadius: 15,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2B326B)),
+                          strokeWidth: 3,
+                        ),
+                      ),
+                    );
                   }
 
                   if (snapshot.hasError) {
-                    return Text('Error: ${snapshot.error}');
+                    return Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE6E8F0),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0xFFBCC0D0),
+                            offset: Offset(8, 8),
+                            blurRadius: 15,
+                            spreadRadius: 1,
+                          ),
+                          BoxShadow(
+                            color: Colors.white,
+                            offset: Offset(-8, -8),
+                            blurRadius: 15,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        'Error loading data',
+                        style: GoogleFonts.poppins(
+                          color: Colors.red[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    );
                   }
 
                   final data = snapshot.data!;
                   return _buildStatsGrid(data);
                 },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
               // Recent Activities
               Text(
                 'Recent Activities',
                 style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF2B326B),
+                  letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 16),
               const RecentActivitiesWidget(),
+              const SizedBox(height: 20), // 🔧 Bottom padding for last element
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildWelcomeCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2B326B), Color(0xFF4A55A2)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Welcome, Admin!',
-            style: GoogleFonts.poppins(
-              fontSize: 24,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFFFFC107),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Manage equipment and user requests',
-            style: GoogleFonts.poppins(fontSize: 16, color: Colors.white),
-          ),
-        ],
       ),
     );
   }
@@ -251,31 +276,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
       children: [
         Expanded(
           child: _buildQuickActionCard(
-            'Add\nEquipment', // Split into two lines for better balance
+            'Add\nEquipment',
             Icons.add_circle_outline,
-            Colors.blue,
+            const Color(0xFF4A90E2), // 🎨 Softer blue
             () {
-              // Navigate to Equipment Management page
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const EquipmentManagementPage(),
                 ),
               ).then((_) {
-                // Refresh dashboard when returning
                 _refreshDashboard();
               });
             },
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 16), // 🔧 Optimized spacing
         Expanded(
           child: _buildQuickActionCard(
-            'Generate\nQR Code', // Split into two lines for better balance
+            'Generate\nQR Code',
             Icons.qr_code,
-            Colors.green,
+            const Color(0xFF50C878), // 🎨 Softer green
             () {
-              // Navigate to QR generator
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -297,39 +319,71 @@ class _AdminDashboardState extends State<AdminDashboard> {
   ) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200), // 🔧 Smooth animation
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16), // 🔧 Optimized padding
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
+          color: const Color(0xFFE6E8F0), // 🎨 Neumorphic background
+          borderRadius: BorderRadius.circular(18), // 🔧 Slightly smaller radius
+          boxShadow: const [
+            // 🎨 Neumorphic shadows
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Color(0xFFBCC0D0),
+              offset: Offset(6, 6), // 🔧 Slightly smaller shadows
+              blurRadius: 12,
               spreadRadius: 1,
-              blurRadius: 5,
-              offset: const Offset(0, 2),
+            ),
+            BoxShadow(
+              color: Colors.white,
+              offset: Offset(-6, -6),
+              blurRadius: 12,
+              spreadRadius: 1,
             ),
           ],
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16), // 🔧 Better proportions
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFE6E8F0),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  // 🎨 Inner neumorphic effect for icon container
+                  BoxShadow(
+                    color: const Color(0xFFBCC0D0).withOpacity(0.7),
+                    offset: const Offset(3, 3),
+                    blurRadius: 6,
+                    spreadRadius: 1,
+                  ),
+                  BoxShadow(
+                    color: Colors.white.withOpacity(0.9),
+                    offset: const Offset(-3, -3),
+                    blurRadius: 6,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
-              child: Icon(icon, color: color, size: 32),
+              child: Icon(
+                icon,
+                color: color,
+                size: 30, // 🔧 Optimized size
+              ),
             ),
             const SizedBox(height: 12),
             Text(
               title,
-              textAlign: TextAlign.center, // Center align the text
+              textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontWeight: FontWeight.w600,
-                fontSize: 14, // Slightly smaller font size for better fit
-                height: 1.2, // Adjust line height for better spacing
+                fontSize: 13, // 🔧 Slightly smaller
+                height: 1.2,
+                color: const Color(0xFF2B326B),
+                letterSpacing: -0.2,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -342,33 +396,34 @@ class _AdminDashboardState extends State<AdminDashboard> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      crossAxisSpacing: 16,
+      crossAxisSpacing: 16, // 🔧 Optimized spacing
       mainAxisSpacing: 16,
-      childAspectRatio: 1.4,
+      childAspectRatio: 1.2, // 🔧 Better proportions
+      
       children: [
         _buildStatCard(
-          'Pending Requests',
+          'Pending\nRequests',
           data['pendingRequests'].toString(),
           Icons.pending_actions,
-          Colors.orange,
+          const Color(0xFFFF8C42), // 🎨 Softer orange
         ),
         _buildStatCard(
-          'Available Items',
+          'Available\nItems',
           data['availableItems'].toString(),
           Icons.check_circle,
-          Colors.green,
+          const Color(0xFF50C878), // 🎨 Softer green
         ),
         _buildStatCard(
-          'Total Equipment',
+          'Total\nEquipment',
           data['totalEquipment'].toString(),
           Icons.inventory_2,
-          Colors.blue,
+          const Color(0xFF4A90E2), // 🎨 Softer blue
         ),
         _buildStatCard(
-          'Active Borrowing',
+          'Active\nBorrowing',
           data['activeBorrowing'].toString(),
           Icons.handshake,
-          Colors.purple,
+          const Color(0xFF9B59B6), // 🎨 Softer purple
         ),
       ],
     );
@@ -381,16 +436,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(5),
+      padding: const EdgeInsets.all(16), // 🔧 Optimized padding
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
+        color: const Color(0xFFE6E8F0), // 🎨 Neumorphic background
+        borderRadius: BorderRadius.circular(18), // 🔧 Consistent radius
+        boxShadow: const [
+          // 🎨 Neumorphic shadows
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Color(0xFFBCC0D0),
+            offset: Offset(6, 6),
+            blurRadius: 12,
             spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
+          ),
+          BoxShadow(
+            color: Colors.white,
+            offset: Offset(-6, -6),
+            blurRadius: 12,
+            spreadRadius: 1,
           ),
         ],
       ),
@@ -399,40 +461,57 @@ class _AdminDashboardState extends State<AdminDashboard> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10), // 🔧 Better proportions
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: const Color(0xFFE6E8F0),
               borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                // 🎨 Inner neumorphic effect for icon
+                BoxShadow(
+                  color: const Color(0xFFBCC0D0).withOpacity(0.7),
+                  offset: const Offset(3, 3),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.9),
+                  offset: const Offset(-3, -3),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ],
             ),
             child: Icon(
               icon,
               color: color,
-              size: 24,
+              size: 24, // 🔧 Consistent size
             ),
           ),
-          const SizedBox(height: 8),
-          Flexible(
-            child: Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 20, // 🔧 Optimized size
+              fontWeight: FontWeight.bold,
+              color: color,
+              letterSpacing: -0.5,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 2),
-          Flexible(
-            child: Text(
-              title,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+          const SizedBox(height: 4),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 11, // 🔧 Smaller for better fit
+              color: const Color(0xFF2B326B).withOpacity(0.8),
+              fontWeight: FontWeight.bold,
+              height: 1.1,
+              letterSpacing: -0.2,
             ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

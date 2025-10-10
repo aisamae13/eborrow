@@ -18,6 +18,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   int _refreshKey = 0;
+  
+  // Add this map to track real-time user states
+  Map<String, Map<String, dynamic>> _userStateOverrides = {};
 
   @override
   void dispose() {
@@ -28,6 +31,24 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   void _refreshData() {
     setState(() {
       _refreshKey++;
+      _userStateOverrides.clear(); // Clear overrides on refresh
+    });
+  }
+
+  // Add method to update user state locally
+  void _updateUserStateLocally(String userId, Map<String, dynamic> updates) {
+    setState(() {
+      _userStateOverrides[userId] = {
+        ...(_userStateOverrides[userId] ?? {}),
+        ...updates,
+      };
+    });
+  }
+
+  // Add method to remove user locally
+  void _removeUserLocally(String userId) {
+    setState(() {
+      _userStateOverrides[userId] = {'_deleted': true};
     });
   }
 
@@ -48,6 +69,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       final userIdFromDb = user['id'] as String;
       if (userIdFromDb == currentUserId) return false;
 
+      // Check if user is marked as deleted locally
+      if (_userStateOverrides[userIdFromDb]?['_deleted'] == true) {
+        return false;
+      }
+
       if (_searchQuery.isEmpty) return true;
 
       final firstName = (user['first_name'] ?? '').toLowerCase();
@@ -60,6 +86,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           lastName.contains(query) ||
           email.contains(query) ||
           studentId.contains(query);
+    }).toList();
+
+    // Apply local state overrides
+    filteredUsers = filteredUsers.map((user) {
+      final userId = user['id'] as String;
+      final overrides = _userStateOverrides[userId];
+      if (overrides != null) {
+        return {...user, ...overrides};
+      }
+      return user;
     }).toList();
 
     filteredUsers.sort((a, b) {
@@ -522,20 +558,27 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               ),
               onPressed: () {
                 Navigator.of(dialogContext).pop();
+                
+                // ✅ Update UI immediately
+                _removeUserLocally(userId);
+                
+                // Show immediate success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'User account deleted successfully.',
+                      style: GoogleFonts.poppins(),
+                    ),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                
+                // Then perform the actual deletion
                 AdminService.deleteBorrowerAccount(userId).then((_) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'User account deleted successfully.',
-                          style: GoogleFonts.poppins(),
-                        ),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                    _refreshData();
-                  }
+                  // If deletion fails, we could restore the user
+                  print('✅ User deletion completed successfully');
                 }).catchError((e) {
+                  // If deletion fails, show error and refresh to restore UI
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -546,6 +589,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         backgroundColor: Colors.red,
                       ),
                     );
+                    _refreshData(); // Refresh to restore the user if deletion failed
                   }
                 });
               },
@@ -600,20 +644,28 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               ),
               onPressed: () {
                 Navigator.of(dialogContext).pop();
+                
+                // ✅ Update UI immediately
+                _updateUserStateLocally(userId, {'is_suspended': !currentlySuspended});
+                
+                // Show immediate success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'User ${action.toLowerCase()}ed successfully.',
+                      style: GoogleFonts.poppins(),
+                    ),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                
+                // Then perform the actual action
                 AdminService.toggleSuspendUser(userId, !currentlySuspended).then((_) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'User ${action.toLowerCase()}ed successfully.',
-                          style: GoogleFonts.poppins(),
-                        ),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
+                  print('✅ User suspend/unsuspend completed successfully');
                 }).catchError((e) {
+                  // If action fails, revert the UI change
                   if (context.mounted) {
+                    _updateUserStateLocally(userId, {'is_suspended': currentlySuspended});
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -673,19 +725,21 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               ),
               onPressed: () async {
                 Navigator.of(dialogContext).pop();
+                
+                // ✅ Show immediate success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Password reset email sent to $email',
+                      style: GoogleFonts.poppins(),
+                    ),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                
                 try {
                   await supabase.auth.resetPasswordForEmail(email);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Password reset email sent to $email',
-                          style: GoogleFonts.poppins(),
-                        ),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
+                  print('✅ Password reset email sent successfully');
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(

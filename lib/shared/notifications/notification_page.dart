@@ -19,19 +19,23 @@ class _NotificationPageState extends State<NotificationPage> {
   void initState() {
     super.initState();
 
-    // ✅ FIX: Call initializeRealtime. This function handles both
-    // the initial data fetch (loadNotifications) and the Realtime subscription
-    // to ensure fast loading and continuous updates.
+    // 🚀 IMPROVED: Don't reinitialize if already initialized by the badge
+    // Just ensure we have the current user's data loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userId = supabase.auth.currentUser?.id;
       if (userId != null) {
-        context.read<NotificationProvider>().initializeRealtime(userId);
+        final provider = context.read<NotificationProvider>();
+        
+        // If not already initialized or user changed, initialize
+        if (provider.currentUserId != userId || provider.notifications.isEmpty) {
+          provider.initializeRealtime(userId);
+        } else {
+          // Already initialized, just refresh the data if needed
+          debugPrint('📋 Notifications already loaded for user: $userId');
+        }
       }
     });
   }
-
-  // ❌ NOTE: The original _loadNotifications() function is removed here
-  // because its logic is now correctly handled inside NotificationProvider.initializeRealtime().
 
   void _markAsRead(NotificationItem notification) {
     if (!notification.isRead) {
@@ -64,7 +68,12 @@ class _NotificationPageState extends State<NotificationPage> {
       ),
       body: Consumer<NotificationProvider>(
         builder: (context, notificationProvider, child) {
-          if (notificationProvider.isLoading) {
+          // 🚀 IMPROVED: Better loading state management
+          // Show loading only if we truly have no data and are loading
+          final shouldShowLoading = notificationProvider.isLoading && 
+                                  notificationProvider.notifications.isEmpty;
+
+          if (shouldShowLoading) {
             return const Center(child: CircularProgressIndicator());
           }
 

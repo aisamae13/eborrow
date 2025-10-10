@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vibration/vibration.dart'; // 🆕 NEW: Import vibration package
 import '/main.dart';
 
 // Enhanced NotificationItem class
@@ -134,22 +135,135 @@ class NotificationItem {
         return Colors.grey;
     }
   }
+
+  // 🆕 NEW: Method to check if notification should vibrate
+  bool get shouldVibrate {
+    switch (type) {
+      case NotificationType.equipmentOverdue:
+        return true; // Vibrate for overdue equipment
+      case NotificationType.returnReminder:
+        return metadata?['is_urgent'] == true; // Vibrate for urgent reminders
+      default:
+        return false;
+    }
+  }
 }
 
-// 🆕 NEW: Local Return Reminder Service
+// 🆕 NEW: Vibration Helper Class
+class VibrationHelper {
+  static bool _vibrationEnabled = true;
+  static bool _hasVibrator = false;
+
+  static Future<void> initialize() async {
+    try {
+      _hasVibrator = await Vibration.hasVibrator() ?? false;
+      debugPrint('🔸 Vibration support detected: $_hasVibrator');
+    } catch (e) {
+      debugPrint('❌ Error checking vibration support: $e');
+      _hasVibrator = false;
+    }
+  }
+
+  static void enableVibration(bool enabled) {
+    _vibrationEnabled = enabled;
+    debugPrint('🔸 Vibration ${enabled ? 'enabled' : 'disabled'}');
+  }
+
+  static Future<void> vibrateForNotification(NotificationType type) async {
+    if (!_vibrationEnabled || !_hasVibrator) return;
+
+    try {
+      switch (type) {
+        case NotificationType.equipmentOverdue:
+          // Strong vibration pattern for overdue equipment (urgent)
+          await Vibration.vibrate(
+            duration: 1000, // 1 second
+            amplitude: 255, // Max intensity
+          );
+          // Wait and vibrate again
+          await Future.delayed(const Duration(milliseconds: 500));
+          await Vibration.vibrate(
+            duration: 1000,
+            amplitude: 255,
+          );
+          debugPrint('📳 Strong vibration for overdue equipment');
+          break;
+
+        case NotificationType.returnReminder:
+          // Medium vibration for return reminders
+          await Vibration.vibrate(
+            duration: 500, // 0.5 seconds
+            amplitude: 180,
+          );
+          debugPrint('📳 Medium vibration for return reminder');
+          break;
+
+        case NotificationType.requestApproved:
+        case NotificationType.requestRejected:
+          // Light vibration for request updates
+          await Vibration.vibrate(
+            duration: 200,
+            amplitude: 100,
+          );
+          debugPrint('📳 Light vibration for request update');
+          break;
+
+        default:
+          // Default light vibration
+          await Vibration.vibrate(duration: 150);
+          debugPrint('📳 Default vibration');
+          break;
+      }
+    } catch (e) {
+      debugPrint('❌ Error vibrating: $e');
+    }
+  }
+
+  static Future<void> vibratePattern(List<int> pattern) async {
+    if (!_vibrationEnabled || !_hasVibrator) return;
+
+    try {
+      await Vibration.vibrate(pattern: pattern);
+    } catch (e) {
+      debugPrint('❌ Error vibrating pattern: $e');
+    }
+  }
+
+  // 🆕 NEW: Custom vibration patterns
+  static Future<void> vibrateOverdueAlert() async {
+    // Pattern: vibrate 500ms, pause 300ms, vibrate 500ms, pause 300ms, vibrate 1000ms
+    const pattern = [0, 500, 300, 500, 300, 1000];
+    await vibratePattern(pattern);
+    debugPrint('📳 Overdue alert vibration pattern');
+  }
+
+  static Future<void> vibrateUrgentReminder() async {
+    // Pattern: quick bursts - vibrate 200ms, pause 100ms, repeat 3 times
+    const pattern = [0, 200, 100, 200, 100, 200];
+    await vibratePattern(pattern);
+    debugPrint('📳 Urgent reminder vibration pattern');
+  }
+}
+
+// 🆕 NEW: Enhanced Local Return Reminder Service with Overdue Detection
 class LocalReminderService {
   static Timer? _reminderTimer;
+  static Timer? _overdueCheckTimer; // 🆕 NEW: Timer for overdue checks
   static final Map<String, Timer> _activeReminders = {};
+  static final Set<String> _notifiedOverdueRequests = {}; // 🆕 NEW: Track notified overdue requests
   static NotificationProvider? _notificationProvider;
 
   static void initialize(NotificationProvider provider) {
     _notificationProvider = provider;
     _startMonitoring();
+    _startOverdueMonitoring(); // 🆕 NEW: Start overdue monitoring
   }
 
   static void dispose() {
     _reminderTimer?.cancel();
+    _overdueCheckTimer?.cancel(); // 🆕 NEW: Cancel overdue timer
     _clearAllReminders();
+    _notifiedOverdueRequests.clear(); // 🆕 NEW: Clear overdue tracking
   }
 
   static void _startMonitoring() {
@@ -158,6 +272,73 @@ class LocalReminderService {
       _checkForReminders();
     });
     debugPrint('🔔 Local reminder monitoring started');
+  }
+
+  // 🆕 NEW: Monitor for overdue equipment
+  static void _startOverdueMonitoring() {
+    // Check for overdue equipment every 5 minutes
+    _overdueCheckTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      _checkForOverdueEquipment();
+    });
+    debugPrint('⚠️ Overdue monitoring started');
+  }
+
+  // 🆕 NEW: Check for overdue equipment and create notifications with vibration
+  static Future<void> _checkForOverdueEquipment() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      // Fetch overdue borrowings
+      final response = await supabase
+          .from('borrow_requests')
+          .select('request_id, return_date, equipment(name)')
+          .eq('borrower_id', userId)
+          .inFilter('status', ['active'])
+          .order('return_date', ascending: true);
+
+      final now = DateTime.now();
+      
+      for (final request in response) {
+        final requestId = request['request_id'].toString();
+        final returnDate = DateTime.parse(request['return_date']);
+        final equipmentName = request['equipment']['name'] ?? 'Equipment';
+        
+        // Check if equipment is overdue (past return date)
+        if (now.isAfter(returnDate)) {
+          // Only notify once per overdue request
+          if (!_notifiedOverdueRequests.contains(requestId)) {
+            final hoursOverdue = now.difference(returnDate).inHours;
+            
+            // Create overdue notification
+            final notification = NotificationItem.local(
+              id: 'overdue_$requestId',
+              title: '🚨 Equipment Overdue!',
+              message: 'Your borrowed "$equipmentName" is overdue by $hoursOverdue hours. Please return it immediately to avoid penalties!',
+              type: NotificationType.equipmentOverdue,
+              metadata: {
+                'equipment_name': equipmentName,
+                'request_id': requestId,
+                'hours_overdue': hoursOverdue,
+                'return_date': returnDate.toIso8601String(),
+              },
+            );
+
+            _notificationProvider?.addLocalNotification(notification);
+            
+            // 🚨 VIBRATE FOR OVERDUE EQUIPMENT
+            await VibrationHelper.vibrateOverdueAlert();
+            
+            // Mark as notified to prevent spam
+            _notifiedOverdueRequests.add(requestId);
+            
+            debugPrint('🚨 Created overdue notification for $equipmentName ($hoursOverdue hours overdue)');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error checking for overdue equipment: $e');
+    }
   }
 
   static Future<void> _checkForReminders() async {
@@ -191,7 +372,7 @@ class LocalReminderService {
             isUrgent: false,
           );
         }
-        // Schedule 5-minute urgent reminder
+        // Schedule 5-minute urgent reminder with vibration
         else if (minutesUntilDue <= 5 && minutesUntilDue > 0) {
           _scheduleReminder(
             requestId: requestId,
@@ -237,6 +418,11 @@ class LocalReminderService {
 
     _notificationProvider?.addLocalNotification(notification);
 
+    // 🚨 VIBRATE FOR URGENT REMINDERS
+    if (isUrgent) {
+      VibrationHelper.vibrateUrgentReminder();
+    }
+
     // Set timer to clean up after 5 minutes
     _activeReminders[reminderId] = Timer(const Duration(minutes: 5), () {
       _activeReminders.remove(reminderId);
@@ -259,6 +445,10 @@ class LocalReminderService {
       _activeReminders[key]?.cancel();
       _activeReminders.remove(key);
     }
+    
+    // Also remove from overdue tracking when equipment is returned
+    _notifiedOverdueRequests.remove(requestId);
+    
     debugPrint('🔕 Cancelled reminders for request $requestId');
   }
 }
@@ -269,17 +459,44 @@ class NotificationProvider extends ChangeNotifier {
   int _unreadCount = 0;
   bool _isLoading = false;
   RealtimeChannel? _subscription;
+  String? _currentUserId; // 🆕 NEW: Track current user ID
 
   List<NotificationItem> get notifications => _notifications;
   int get unreadCount => _unreadCount;
   bool get isLoading => _isLoading;
+  String? get currentUserId => _currentUserId; // 🚀 NEW: Expose current user ID
 
   void initializeRealtime(String userId) {
-    _subscription?.unsubscribe();
+    // 🚀 IMPROVED: Better initialization logic
+    final bool userChanged = _currentUserId != userId;
+    final bool hasExistingSubscription = _subscription != null;
+    
+    if (!userChanged && hasExistingSubscription && _notifications.isNotEmpty) {
+      debugPrint('📋 User unchanged ($userId), subscription active, data exists - skipping reinitialization');
+      return;
+    }
+
+    debugPrint('🔄 Initializing notifications for user: $userId (previous: $_currentUserId, userChanged: $userChanged)');
+    _currentUserId = userId;
+    
+    // Only unsubscribe if user changed
+    if (userChanged) {
+      _subscription?.unsubscribe();
+      _notifications.clear(); // Clear previous user's notifications
+      _unreadCount = 0;
+    }
+    
+    // 🚀 IMPROVED: Set loading state only if we don't have data
+    if (_notifications.isEmpty) {
+      _isLoading = true;
+      notifyListeners(); // Notify immediately for loading state
+    }
+    
     loadNotifications(userId); // Load initial data
     
-    // 🆕 NEW: Initialize local reminder service
+    // 🆕 NEW: Initialize local reminder service and vibration
     LocalReminderService.initialize(this);
+    VibrationHelper.initialize(); // 🆕 NEW: Initialize vibration support
 
     try {
       // 🚀 EFFICIENCY FIX: Filter real-time events by user_id to reduce traffic and processing.
@@ -316,7 +533,20 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  // 🆕 NEW: Add local notification method
+  // 🆕 NEW: Clear notifications method for account switching
+  void clearNotifications() {
+    debugPrint('🧹 Clearing all notifications');
+    _subscription?.unsubscribe();
+    _subscription = null;
+    _currentUserId = null;
+    _notifications.clear();
+    _unreadCount = 0;
+    _isLoading = false;
+    LocalReminderService.dispose();
+    notifyListeners();
+  }
+
+  // 🆕 NEW: Add local notification method with vibration
   void addLocalNotification(NotificationItem notification) {
     // Check if similar notification already exists
     final exists = _notifications.any((n) => 
@@ -328,6 +558,12 @@ class NotificationProvider extends ChangeNotifier {
     if (!exists) {
       _notifications.insert(0, notification);
       _unreadCount++;
+      
+      // 🚨 VIBRATE FOR QUALIFYING NOTIFICATIONS
+      if (notification.shouldVibrate) {
+        VibrationHelper.vibrateForNotification(notification.type);
+      }
+      
       debugPrint('🔔 Added local notification: ${notification.title}');
       notifyListeners();
     }
@@ -340,6 +576,12 @@ class NotificationProvider extends ChangeNotifier {
     if (!newNotification.isRead) {
       _unreadCount++;
     }
+    
+    // 🚨 VIBRATE FOR QUALIFYING DB NOTIFICATIONS
+    if (newNotification.shouldVibrate) {
+      VibrationHelper.vibrateForNotification(newNotification.type);
+    }
+    
     debugPrint('📊 After insert - Total: ${_notifications.length}, Unread: $_unreadCount');
     notifyListeners();
   }
@@ -372,10 +614,6 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> loadNotifications(String userId) async {
-    // 1. Immediately set loading state and notify to show spinner fast
-    _isLoading = true;
-    notifyListeners();
-
     final startTime = DateTime.now(); // ⏱️ Start timer for debugging
 
     try {
@@ -408,7 +646,7 @@ class NotificationProvider extends ChangeNotifier {
 
       debugPrint('✅ Loaded ${_notifications.length} notifications, $_unreadCount unread');
       debugPrint('📋 Notification details:');
-      for (var n in _notifications) {
+      for (var n in _notifications.take(5)) {
         debugPrint('   - ${n.title}: isRead=${n.isRead}, id=${n.id}, isLocal=${n.isLocal}');
       }
     } catch (e) {
@@ -569,8 +807,9 @@ class NotificationService {
   // ⚠️ REMOVED: createRequestRejectedNotification (Now handled by DB trigger)
   // ⚠️ REMOVED: createEquipmentReturnedNotification (Now handled by DB trigger)
 
+  // 🚨 ENHANCED: Overdue notification with vibration support
   static Future<void> createEquipmentOverdueNotification({
-    required String userId, // This should probably be the admin's ID
+    required String userId, // This should be the borrower's ID for vibration
     required String userName,
     required String equipmentName,
   }) async {
