@@ -398,29 +398,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
       crossAxisCount: 2,
       crossAxisSpacing: 16, // 🔧 Optimized spacing
       mainAxisSpacing: 16,
-      childAspectRatio: 1.2, // 🔧 Better proportions
-      
+      childAspectRatio: 1.4, // 🔧 FIXED: Increased aspect ratio to prevent overflow
       children: [
         _buildStatCard(
-          'Pending\nRequests',
+          'Pending Requests',
           data['pendingRequests'].toString(),
           Icons.pending_actions,
           const Color(0xFFFF8C42), // 🎨 Softer orange
         ),
         _buildStatCard(
-          'Available\nItems',
+          'Available Items',
           data['availableItems'].toString(),
           Icons.check_circle,
           const Color(0xFF50C878), // 🎨 Softer green
         ),
         _buildStatCard(
-          'Total\nEquipment',
+          'Total Equipment',
           data['totalEquipment'].toString(),
           Icons.inventory_2,
           const Color(0xFF4A90E2), // 🎨 Softer blue
         ),
         _buildStatCard(
-          'Active\nBorrowing',
+          'Active Borrowing',
           data['activeBorrowing'].toString(),
           Icons.handshake,
           const Color(0xFF9B59B6), // 🎨 Softer purple
@@ -436,7 +435,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(16), // 🔧 Optimized padding
+      padding: const EdgeInsets.all(12), // 🔧 FIXED: Reduced padding to prevent overflow
       decoration: BoxDecoration(
         color: const Color(0xFFE6E8F0), // 🎨 Neumorphic background
         borderRadius: BorderRadius.circular(18), // 🔧 Consistent radius
@@ -460,58 +459,73 @@ class _AdminDashboardState extends State<AdminDashboard> {
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10), // 🔧 Better proportions
-            decoration: BoxDecoration(
-              color: const Color(0xFFE6E8F0),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                // 🎨 Inner neumorphic effect for icon
-                BoxShadow(
-                  color: const Color(0xFFBCC0D0).withOpacity(0.7),
-                  offset: const Offset(3, 3),
-                  blurRadius: 6,
-                  spreadRadius: 1,
-                ),
-                BoxShadow(
-                  color: Colors.white.withOpacity(0.9),
-                  offset: const Offset(-3, -3),
-                  blurRadius: 6,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24, // 🔧 Consistent size
+          // Icon container
+          Flexible( // 🔧 FIXED: Made icon container flexible
+            flex: 2,
+            child: Container(
+              padding: const EdgeInsets.all(8), // 🔧 FIXED: Reduced padding
+              decoration: BoxDecoration(
+                color: const Color(0xFFE6E8F0),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  // 🎨 Inner neumorphic effect for icon
+                  BoxShadow(
+                    color: const Color(0xFFBCC0D0).withOpacity(0.7),
+                    offset: const Offset(3, 3),
+                    blurRadius: 6,
+                    spreadRadius: 1,
+                  ),
+                  BoxShadow(
+                    color: Colors.white.withOpacity(0.9),
+                    offset: const Offset(-3, -3),
+                    blurRadius: 6,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 22, // 🔧 FIXED: Reduced icon size
+              ),
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 20, // 🔧 Optimized size
-              fontWeight: FontWeight.bold,
-              color: color,
-              letterSpacing: -0.5,
+          const SizedBox(height: 6), // 🔧 FIXED: Reduced spacing
+          // Value text
+          Flexible( // 🔧 FIXED: Made value text flexible
+            flex: 1,
+            child: FittedBox( // 🔧 FIXED: Added FittedBox to scale text if needed
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: GoogleFonts.poppins(
+                  fontSize: 18, // 🔧 FIXED: Reduced font size
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  letterSpacing: -0.5,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontSize: 11, // 🔧 Smaller for better fit
-              color: const Color(0xFF2B326B).withOpacity(0.8),
-              fontWeight: FontWeight.bold,
-              height: 1.1,
-              letterSpacing: -0.2,
+          const SizedBox(height: 2), // 🔧 FIXED: Reduced spacing
+          // Title text
+          Flexible( // 🔧 FIXED: Made title text flexible
+            flex: 1,
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 10, // 🔧 FIXED: Reduced font size
+                color: const Color(0xFF2B326B).withOpacity(0.8),
+                fontWeight: FontWeight.w600, // 🔧 FIXED: Slightly lighter weight
+                height: 1.1,
+                letterSpacing: -0.2,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
