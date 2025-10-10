@@ -766,7 +766,7 @@ class _ActivityLogPageState extends State<ActivityLogPage> {
           Text(
             _filterType == 'all'
                 ? 'No activity logs yet'
-                : 'No ${_filterType} actions found',
+                : 'No $_filterType actions found',
             style: GoogleFonts.poppins(
               fontSize: 16,
               color: Colors.grey[600],

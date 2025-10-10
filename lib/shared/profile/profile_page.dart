@@ -34,21 +34,40 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() {
       _isLoading = true;
     });
+    
     try {
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) {
         throw 'User not found.';
       }
+
+      // Try to fetch existing profile first
       final response = await supabase
           .from('user_profiles')
           .select()
           .eq('id', userId)
-          .single();
+          .maybeSingle(); // Use maybeSingle() instead of single() to handle missing records
 
-      setState(() {
-        _profileData = response;
-        _isLoading = false;
-      });
+      if (response == null) {
+        // Profile doesn't exist, create one
+        await _createUserProfile(userId);
+        // Fetch again after creation
+        final newResponse = await supabase
+            .from('user_profiles')
+            .select()
+            .eq('id', userId)
+            .single();
+        
+        setState(() {
+          _profileData = newResponse;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _profileData = response;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -61,6 +80,35 @@ class _ProfilePageState extends State<ProfilePage> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _createUserProfile(String userId) async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) throw 'User not found';
+
+      // Extract user information from auth metadata
+      final firstName = user.userMetadata?['first_name'] ?? 
+                       user.userMetadata?['full_name']?.split(' ').first ?? 
+                       'User';
+      final lastName = user.userMetadata?['last_name'] ??
+          ((user.userMetadata?['full_name'] != null &&
+                  (user.userMetadata?['full_name'] as String).split(' ').length > 1)
+              ? (user.userMetadata?['full_name'] as String).split(' ').last
+              : 'Name') ??
+          'Name';
+
+      await supabase.from('user_profiles').insert({
+        'id': userId,
+        'first_name': firstName,
+        'last_name': lastName,
+        'email': user.email ?? '',
+        'role': 'borrower',
+      });
+    } catch (e) {
+      debugPrint('Error creating user profile: $e');
+      rethrow;
     }
   }
 
@@ -918,7 +966,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           const SizedBox(height: 16),
 
-          // Student ID Row - Hide edit icon if already edited once
+          // Student ID Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

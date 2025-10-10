@@ -128,7 +128,7 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
                           Text(
                             _selectedFilter == 'all'
                                 ? 'No reported issues yet'
-                                : 'No ${_selectedFilter} issues',
+                                : 'No $_selectedFilter issues',
                             style: GoogleFonts.poppins(color: Colors.grey[500]),
                           ),
                         ],

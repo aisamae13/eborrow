@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../models/borrow_request.dart';
+import '../../admin/widgets/borrow_countdown_timer.dart';
 
 void showRequestDetailPopup(BuildContext context, BorrowRequest item) {
   // Determine if this is an admin rejection (cancelled with rejection reason)
@@ -50,6 +51,29 @@ void showRequestDetailPopup(BuildContext context, BorrowRequest item) {
             _buildDetailRow('Return Date', DateFormat('MMM dd, yyyy hh:mm a').format(item.returnDate)),
 
             const SizedBox(height: 15),
+
+            // ADDED: Countdown Timer for approved, active, and overdue requests
+            if (['approved','active','overdue'].contains(item.status.toLowerCase())) ...[
+              Text(
+                'Time Status',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
+              BorrowCountdownTimer(
+                borrowDate: item.borrowDate,
+                returnDate: item.returnDate,
+                compact: false,
+                onFinished: () {
+                  // Optional: Close popup and refresh parent when status changes
+                  Navigator.of(context).pop();
+                },
+              ),
+              const SizedBox(height: 15),
+            ],
 
             // Purpose
             if (item.purpose != null && item.purpose!.isNotEmpty)

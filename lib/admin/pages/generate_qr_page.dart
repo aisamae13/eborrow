@@ -13,7 +13,7 @@ import 'dart:io';
 import '../../main.dart';
 
 class GenerateQRPage extends StatefulWidget {
-  const GenerateQRPage({Key? key}) : super(key: key);
+  const GenerateQRPage({super.key});
 
   @override
   State<GenerateQRPage> createState() => _GenerateQRPageState();

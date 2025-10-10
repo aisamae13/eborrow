@@ -571,4 +571,112 @@ class EquipmentManagementService {
       };
     }
   }
+
+  // Update the archiveEquipment method in EquipmentManagementService
+  static Future<void> archiveEquipment(int equipmentId) async {
+    try {
+      // Check if equipment is currently borrowed
+      final activeRequests = await supabase
+          .from('borrow_requests')
+          .select('request_id, status')
+          .eq('equipment_id', equipmentId)
+          .inFilter('status', ['pending', 'approved', 'active']);
+
+      if (activeRequests.isNotEmpty) {
+        // Count different types of active requests
+        final pendingCount = activeRequests
+            .where((req) => req['status'] == 'pending')
+            .length;
+        final approvedCount = activeRequests
+            .where((req) => req['status'] == 'approved')
+            .length;
+        final activeCount = activeRequests
+            .where((req) => req['status'] == 'active')
+            .length;
+
+        String message = 'Cannot archive this equipment because it has ';
+        List<String> reasons = [];
+
+        if (pendingCount > 0) {
+          reasons.add(
+            '$pendingCount pending borrow request${pendingCount > 1 ? 's' : ''}',
+          );
+        }
+        if (approvedCount > 0) {
+          reasons.add(
+            '$approvedCount approved borrow request${approvedCount > 1 ? 's' : ''}',
+          );
+        }
+        if (activeCount > 0) {
+          reasons.add(
+            '$activeCount active borrowing${activeCount > 1 ? 's' : ''}',
+          );
+        }
+
+        if (reasons.length == 1) {
+          message += reasons[0];
+        } else if (reasons.length == 2) {
+          message += '${reasons[0]} and ${reasons[1]}';
+        } else {
+          message +=
+              '${reasons.sublist(0, reasons.length - 1).join(', ')}, and ${reasons.last}';
+        }
+
+        message += '. Please resolve these requests first.';
+
+        throw Exception(message);
+      }
+
+      // Check if equipment has unresolved issues
+      final unresolvedIssues = await supabase
+          .from('issues')
+          .select('issue_id')
+          .eq('equipment_id', equipmentId)
+          .neq('status', 'resolved');
+
+      if (unresolvedIssues.isNotEmpty) {
+        final issueCount = unresolvedIssues.length;
+        throw Exception(
+          'Cannot archive this equipment because it has $issueCount unresolved issue${issueCount > 1 ? 's' : ''}. Please resolve all issues first.',
+        );
+      }
+
+      // Archive the equipment by changing status to 'retired'
+      await supabase
+          .from('equipment')
+          .update({
+            'status': 'retired',
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('equipment_id', equipmentId);
+    } on PostgrestException catch (e) {
+      // Handle specific PostgreSQL errors with user-friendly messages
+      if (e.code == '23503') {
+        // Foreign key constraint violation
+        throw Exception(
+          'Cannot archive this equipment because it is referenced in other records. Please remove all related data first.',
+        );
+      } else if (e.code == '23505') {
+        // Unique constraint violation (shouldn't happen in archive, but just in case)
+        throw Exception(
+          'A database constraint prevents this equipment from being archived.',
+        );
+      } else {
+        // Other database errors
+        throw Exception(
+          'Unable to archive this equipment due to a database error. Please try again or contact support.',
+        );
+      }
+    } catch (e) {
+      // Handle our custom exceptions (don't modify them)
+      if (e.toString().startsWith('Exception: Cannot archive this equipment')) {
+        rethrow; // Keep our user-friendly messages
+      }
+
+      // Handle any other unexpected errors
+      throw Exception(
+        'An unexpected error occurred while archiving the equipment. Please try again.',
+      );
+    }
+  }
 }

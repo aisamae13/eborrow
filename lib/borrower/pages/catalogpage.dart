@@ -391,7 +391,7 @@ class _CatalogPageState extends State<CatalogPage>
                           _showAvailableOnly = value;
                         });
                       },
-                      activeColor: const Color(0xFF2B326B),
+                      activeThumbColor: const Color(0xFF2B326B),
                     ),
                     const SizedBox(height: 16),
                     Row(

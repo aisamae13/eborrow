@@ -253,3 +253,46 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     );
   }
 }
+
+class EquipmentPage extends StatelessWidget {
+  const EquipmentPage({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Equipment'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.archive, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ArchivedEquipmentPage()),
+              );
+            },
+          ),
+        ],
+      ),
+      body: const Center(
+        child: Text('List of Equipment'),
+      ),
+    );
+  }
+}
+
+class ArchivedEquipmentPage extends StatelessWidget {
+  const ArchivedEquipmentPage({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Archived Equipment'),
+      ),
+      body: const Center(
+        child: Text('List of Archived Equipment'),
+      ),
+    );
+  }
+}

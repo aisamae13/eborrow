@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../services/request_management_service.dart';
 import '../../main.dart';
-import '../widgets/borrow_countdown_timer.dart';
+import '../widgets/borrow_countdown_timer.dart'; // <-- ADD THIS
 
 class RequestsManagementPage extends StatefulWidget {
   const RequestsManagementPage({super.key});
@@ -20,13 +20,17 @@ class _RequestsManagementPageState extends State<RequestsManagementPage>
   @override
   void initState() {
     super.initState();
+    // CHANGED: Length is now 7 to include 'Overdue'
     _tabController = TabController(length: 7, vsync: this);
   }
 
+  // Forces a full rebuild of the TabBarView and switches to the correct tab.
   void _refreshAllTabsAndSwitch({String? targetStatus}) {
     setState(() {
+      // Force a rebuild of all tabs (reload data in RequestListTab)
       _tabViewKey = UniqueKey();
 
+      // Switch to the appropriate tab based on target status
       if (targetStatus != null) {
         final targetIndex = _getTabIndexForStatus(targetStatus);
         if (targetIndex != -1) {
@@ -36,6 +40,7 @@ class _RequestsManagementPageState extends State<RequestsManagementPage>
     });
   }
 
+  // Helper to get tab index from status
   int _getTabIndexForStatus(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -44,14 +49,14 @@ class _RequestsManagementPageState extends State<RequestsManagementPage>
         return 1;
       case 'active':
         return 2;
-      case 'overdue':
+      case 'overdue': // <--- ADDED
         return 3;
       case 'returned':
-        return 4;
+        return 4; // Index shifted
       case 'cancelled':
-        return 5;
+        return 5; // Index shifted
       case 'expired':
-        return 6;
+        return 6; // Index shifted
       default:
         return -1;
     }
@@ -89,7 +94,7 @@ class _RequestsManagementPageState extends State<RequestsManagementPage>
             Tab(text: 'Pending'),
             Tab(text: 'Approved'),
             Tab(text: 'Active'),
-            Tab(text: 'Overdue'),
+            Tab(text: 'Overdue'), // <--- ADDED
             Tab(text: 'Returned'),
             Tab(text: 'Cancelled'),
             Tab(text: 'Expired'),
@@ -107,7 +112,7 @@ class _RequestsManagementPageState extends State<RequestsManagementPage>
           RequestsTab(
               status: 'active', onGlobalAction: _refreshAllTabsAndSwitch),
           RequestsTab(
-              status: 'overdue', onGlobalAction: _refreshAllTabsAndSwitch),
+              status: 'overdue', onGlobalAction: _refreshAllTabsAndSwitch), // <--- ADDED
           RequestsTab(
               status: 'returned', onGlobalAction: _refreshAllTabsAndSwitch),
           RequestsTab(
@@ -136,7 +141,7 @@ class _RequestsTabState extends State<RequestsTab> with AutomaticKeepAliveClient
   final GlobalKey<RefreshIndicatorState> _refreshKey = GlobalKey<RefreshIndicatorState>();
 
   @override
-  bool get wantKeepAlive => false;
+  bool get wantKeepAlive => false; // Don't keep state alive to force refresh
 
   @override
   void initState() {
@@ -152,30 +157,27 @@ class _RequestsTabState extends State<RequestsTab> with AutomaticKeepAliveClient
     });
   }
 
+  // Auto-trigger refresh after any action
   Future<void> _refreshRequests() async {
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 300)); // Small delay for backend to process
     _loadRequests();
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
 
     return RefreshIndicator(
       key: _refreshKey,
       onRefresh: () async {
         _loadRequests();
-        await _requestsFuture;
+        await _requestsFuture; // Wait for the future to complete
       },
       child: FutureBuilder<List<Map<String, dynamic>>>(
         future: _requestsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF2B326B),
-              ),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.hasError) {
@@ -183,28 +185,19 @@ class _RequestsTabState extends State<RequestsTab> with AutomaticKeepAliveClient
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: Colors.red[300],
-                  ),
+                  Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
-                  Text(
-                    'Error loading requests',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.red[700],
-                    ),
-                  ),
+                  Text('Error loading requests', style: GoogleFonts.poppins()),
                   const SizedBox(height: 8),
                   Text(
                     '${snapshot.error}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.red),
                     textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: _loadRequests,
+                    child: const Text('Retry'),
                   ),
                 ],
               ),
@@ -214,53 +207,52 @@ class _RequestsTabState extends State<RequestsTab> with AutomaticKeepAliveClient
           final requests = snapshot.data ?? [];
 
           if (requests.isEmpty) {
-            return SingleChildScrollView(
+            return ListView( // Wrap in ListView so pull-to-refresh works
               physics: const AlwaysScrollableScrollPhysics(),
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height * 0.6,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _getStatusIcon(widget.status),
-                        size: 80,
-                        color: Colors.grey[400],
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'No ${widget.status} requests',
-                        style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
+              children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.6,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _getStatusIcon(widget.status),
+                          size: 80,
+                          color: Colors.grey[400],
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _getEmptyStateMessage(widget.status),
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.grey[500],
+                        const SizedBox(height: 16),
+                        Text(
+                          'No ${widget.status.toLowerCase()} requests',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[600],
+                          ),
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Text(
+                          _getEmptyStateMessage(widget.status),
+                          style: GoogleFonts.poppins(color: Colors.grey[500]),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             );
           }
 
           return ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(), // Enable pull-to-refresh
             padding: const EdgeInsets.all(16),
             itemCount: requests.length,
             itemBuilder: (context, index) {
-              final request = requests[index];
               return RequestCard(
-                request: request,
+                request: requests[index],
                 onAction: widget.onGlobalAction,
-                onLocalRefresh: _refreshRequests,
+                onLocalRefresh: _refreshRequests, // Pass refresh callback
               );
             },
           );
@@ -268,7 +260,6 @@ class _RequestsTabState extends State<RequestsTab> with AutomaticKeepAliveClient
       ),
     );
   }
-
   IconData _getStatusIcon(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -277,7 +268,7 @@ class _RequestsTabState extends State<RequestsTab> with AutomaticKeepAliveClient
         return Icons.check_circle;
       case 'active':
         return Icons.handshake;
-      case 'overdue':
+      case 'overdue': // <--- ADDED
         return Icons.warning_amber;
       case 'returned':
         return Icons.assignment_return;
@@ -298,7 +289,7 @@ class _RequestsTabState extends State<RequestsTab> with AutomaticKeepAliveClient
         return 'Approved requests ready for pickup';
       case 'active':
         return 'Currently borrowed equipment, on time';
-      case 'overdue':
+      case 'overdue': // <--- ADDED
         return 'Urgent: These items are past their return date!';
       case 'returned':
         return 'Successfully returned equipment';
@@ -315,13 +306,13 @@ class _RequestsTabState extends State<RequestsTab> with AutomaticKeepAliveClient
 class RequestCard extends StatelessWidget {
   final Map<String, dynamic> request;
   final void Function({String? targetStatus}) onAction;
-  final VoidCallback onLocalRefresh;
+  final VoidCallback onLocalRefresh; // Add this
 
   const RequestCard({
     super.key,
     required this.request,
     required this.onAction,
-    required this.onLocalRefresh,
+    required this.onLocalRefresh, // Add this
   });
 
   @override
@@ -329,8 +320,16 @@ class RequestCard extends StatelessWidget {
     final userProfiles = request['user_profiles'] ?? {};
     final equipment = request['equipment'] ?? {};
 
+    // ➡️ ADDED: Check for rejection reason
     final rejectionReason = request['rejection_reason'] as String?;
+
+    // ➡️ ADDED: Determine if it was rejected by admin
+    // We assume if a rejection_reason is present, it was admin-rejected.
+    // (A borrower cancellation wouldn't set this field).
     final isAdminRejected = rejectionReason != null && rejectionReason.isNotEmpty;
+
+
+    // ➡️ ADDED: Extract avatar URL
     final avatarUrl = userProfiles['avatar_url'] as String?;
 
     final userName =
@@ -369,7 +368,7 @@ class RequestCard extends StatelessWidget {
         statusColor = Colors.blue;
         statusBadge = 'Active';
         break;
-      case 'overdue':
+      case 'overdue': // <--- ADDED
         statusColor = Colors.red;
         statusBadge = 'Overdue';
         break;
@@ -419,16 +418,17 @@ class RequestCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
+        // CHANGED: Use simplified check for coloring the background
         color: isCurrentOverdue ? Colors.red.withOpacity(0.05) : Colors.white,
         borderRadius: BorderRadius.circular(15),
-        border: isCurrentOverdue
+        border: isCurrentOverdue // CHANGED: Use simplified check for border
             ? Border.all(color: Colors.red.withOpacity(0.3))
             : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
-            spreadRadius: 0,
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 5,
             offset: const Offset(0, 2),
           ),
         ],
@@ -438,22 +438,30 @@ class RequestCard extends StatelessWidget {
         children: [
           Row(
             children: [
+              // ➡️ MODIFIED: CircleAvatar to display Network Image or Initials
               CircleAvatar(
-                radius: 24,
-                backgroundColor: statusColor.withOpacity(0.2),
-                backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                radius: 20,
+                // 1. Check if we have a valid avatar URL to use for the image
+                backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
                     ? NetworkImage(avatarUrl)
                     : null,
-                child: avatarUrl == null || avatarUrl.isEmpty
+
+                // 2. Set background color: Neutral for image, or status-based for initials
+                backgroundColor: (avatarUrl != null && avatarUrl.isNotEmpty)
+                    ? Colors.grey // Neutral background when image is loaded
+                    : statusColor.withOpacity(0.1), // Original background for initials
+
+                // 3. Fallback: Only show initials (the existing child logic) if NO avatar URL is set
+                child: (avatarUrl == null || avatarUrl.isEmpty)
                     ? Text(
                         getUserInitials(userName),
                         style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
                           color: statusColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
                       )
-                    : null,
+                    : null, // No child when an image is loaded
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -461,18 +469,17 @@ class RequestCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      userName,
+                      userName.isNotEmpty ? userName : 'Unknown User',
                       style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.bold,
                         fontSize: 16,
-                        color: const Color(0xFF2B326B),
                       ),
                     ),
                     Text(
                       studentId,
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
                         color: Colors.grey[600],
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -484,15 +491,15 @@ class RequestCard extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.15),
+                  color: statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   statusBadge,
                   style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
                     color: statusColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
                   ),
                 ),
               ),
@@ -501,10 +508,17 @@ class RequestCard extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              Icon(
-                _getEquipmentIcon(equipmentName),
-                size: 24,
-                color: const Color(0xFF2B326B),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  _getEquipmentIcon(equipmentName),
+                  size: 24,
+                  color: Colors.grey[600],
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -515,16 +529,15 @@ class RequestCard extends StatelessWidget {
                       equipmentName,
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                        color: const Color(0xFF2B326B),
+                        fontSize: 14,
                       ),
                     ),
                     if (equipmentBrand.isNotEmpty)
                       Text(
                         equipmentBrand,
                         style: GoogleFonts.poppins(
-                          fontSize: 13,
                           color: Colors.grey[600],
+                          fontSize: 12,
                         ),
                       ),
                   ],
@@ -537,78 +550,77 @@ class RequestCard extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.shade200),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
               children: [
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.calendar_today,
-                        size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 8),
-                    Text('Borrow Date:',
-                        style: GoogleFonts.poppins(
-                            fontSize: 12, color: Colors.grey[600])),
-                    const Spacer(),
+                    Text(
+                      'Borrow Date:',
+                      style: GoogleFonts.poppins(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
                     Text(
                       '${dateFormatter.format(borrowDate)} ${timeFormatter.format(borrowDate)}',
                       style: GoogleFonts.poppins(
-                          fontSize: 12, fontWeight: FontWeight.w500),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.event_available,
-                        size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 8),
-                    Text('Return Date:',
-                        style: GoogleFonts.poppins(
-                            fontSize: 12, color: Colors.grey[600])),
-                    const Spacer(),
                     Text(
+                      'Return Date:',
+                      style: GoogleFonts.poppins(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      // CHANGED: Use simplified check for return date color
                       '${dateFormatter.format(returnDate)} ${timeFormatter.format(returnDate)}',
                       style: GoogleFonts.poppins(
-                          fontSize: 12, fontWeight: FontWeight.w500),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                        color: isCurrentOverdue ? Colors.red : Colors.black,
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-          // UPDATED: Add countdown timer that stops auto-refreshing for overdue
           if (['approved','active','overdue'].contains(status.toLowerCase())) ...[
             const SizedBox(height: 12),
             BorrowCountdownTimer(
-              borrowDate: borrowDate,
-              returnDate: returnDate,
-              compact: false,
+              borrowDate: borrowDate.toLocal(),
+              returnDate: returnDate.toLocal(),
+              compact: true,
               onFinished: () {
-                // Only refresh if the current status is NOT already overdue
-                // This prevents unnecessary refreshes when already overdue
-                if (context.mounted && status.toLowerCase() != 'overdue') {
-                  onLocalRefresh();
-                }
+                onLocalRefresh();
               },
             ),
           ],
           if (purpose.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Purpose: $purpose',
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: Colors.blue[800],
-                ),
+            Text(
+              'Purpose:',
+              style: GoogleFonts.poppins(color: Colors.grey[600], fontSize: 12),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              purpose,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
               ),
             ),
           ],
@@ -627,7 +639,7 @@ class RequestCard extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButtons(
+ Widget _buildActionButtons(
   BuildContext context,
   String status,
   int requestId,
@@ -641,28 +653,36 @@ class RequestCard extends StatelessWidget {
       return Row(
         children: [
           Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () => _approveRequest(context, requestId, borrowerId, equipmentName),
-              icon: const Icon(Icons.check, size: 16),
-              label: const Text('Approve', style: TextStyle(fontSize: 12)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 10),
+            child: OutlinedButton(
+              onPressed: () => _showRejectDialog(
+                context,
+                requestId,
+                borrowerId,
+                equipmentName,
               ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+              child: const Text('Reject', style: TextStyle(fontSize: 12)),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () => _showRejectDialog(context, requestId, borrowerId, equipmentName),
-              icon: const Icon(Icons.close, size: 16),
-              label: const Text('Reject', style: TextStyle(fontSize: 12)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 10),
+            child: ElevatedButton(
+              onPressed: () => _approveRequest(
+                context,
+                requestId,
+                borrowerId,
+                equipmentName,
               ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+              child: const Text('Approve', style: TextStyle(fontSize: 12)),
             ),
           ),
         ],
@@ -682,35 +702,38 @@ class RequestCard extends StatelessWidget {
         ),
       );
 
-    case 'active':
+    case 'active': // Standard, non-overdue borrowing period
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _sendReminder(context, requestId, borrowerId, equipmentName),
-                  icon: const Icon(Icons.notifications, size: 16),
-                  label: const Text('Remind', style: TextStyle(fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                child: OutlinedButton(
+                  onPressed: () => _sendReminder(
+                    context,
+                    requestId,
+                    borrowerId,
+                    equipmentName,
                   ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange, // Standard reminder color
+                    side: const BorderSide(color: Colors.orange),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                  ),
+                  child: const Text('Remind', style: TextStyle(fontSize: 11)),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
-                child: ElevatedButton.icon(
+                child: OutlinedButton(
                   onPressed: () => _showExtendDialog(context, requestId),
-                  icon: const Icon(Icons.access_time, size: 16),
-                  label: const Text('Extend', style: TextStyle(fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.blue, // Standard extension color
+                    side: const BorderSide(color: Colors.blue),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
                   ),
+                  child: const Text('Extend', style: TextStyle(fontSize: 11)),
                 ),
               ),
             ],
@@ -718,15 +741,14 @@ class RequestCard extends StatelessWidget {
           const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
+            child: ElevatedButton(
               onPressed: () => _markAsReturned(context, requestId, equipmentId),
-              icon: const Icon(Icons.assignment_return, size: 16),
-              label: const Text('Mark as Returned', style: TextStyle(fontSize: 12)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 8),
               ),
+              child: const Text('Mark Returned', style: TextStyle(fontSize: 12)),
             ),
           ),
         ],
@@ -738,39 +760,42 @@ class RequestCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '⚠️ This equipment is overdue! Please contact the borrower immediately.',
+            'Action Required: Item is Overdue',
             style: GoogleFonts.poppins(
-              fontSize: 12,
               color: Colors.red,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
             ),
           ),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _sendReminder(context, requestId, borrowerId, equipmentName),
-                  icon: const Icon(Icons.priority_high, size: 16),
-                  label: const Text('Send Urgent Reminder', style: TextStyle(fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                child: OutlinedButton(
+                  onPressed: () => _sendReminder(
+                    context,
+                    requestId,
+                    borrowerId,
+                    equipmentName,
                   ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red, // URGENT: Red for overdue follow-up
+                    side: const BorderSide(color: Colors.red),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                  ),
+                  child: const Text('Remind', style: TextStyle(fontSize: 11)),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
-                child: ElevatedButton.icon(
+                child: OutlinedButton(
                   onPressed: () => _showExtendDialog(context, requestId),
-                  icon: const Icon(Icons.access_time, size: 16),
-                  label: const Text('Extend', style: TextStyle(fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange, // Slightly less urgent, but modification is possible
+                    side: const BorderSide(color: Colors.orange),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
                   ),
+                  child: const Text('Extend', style: TextStyle(fontSize: 11)),
                 ),
               ),
             ],
@@ -778,15 +803,14 @@ class RequestCard extends StatelessWidget {
           const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
+            child: ElevatedButton(
               onPressed: () => _markAsReturned(context, requestId, equipmentId),
-              icon: const Icon(Icons.assignment_return, size: 16),
-              label: const Text('Mark as Returned', style: TextStyle(fontSize: 12)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
+                backgroundColor: Colors.green, // Final positive action
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 8),
               ),
+              child: const Text('Mark Returned', style: TextStyle(fontSize: 12)),
             ),
           ),
         ],
@@ -799,13 +823,16 @@ class RequestCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.check_circle, color: Colors.green, size: 16),
-            const SizedBox(width: 6),
-            Text(
-              'Equipment successfully returned',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: Colors.green,
-                fontWeight: FontWeight.w500,
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                'Successfully returned',
+                style: GoogleFonts.poppins(
+                  color: Colors.green,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -818,19 +845,23 @@ class RequestCard extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.info, color: Colors.grey, size: 16),
-            const SizedBox(width: 6),
-            Text(
-              isAdminRejected ? 'Request rejected by admin' : 'Request cancelled by user',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+            Icon(Icons.cancel, color: Colors.red, size: 16),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                isAdminRejected ? 'Rejected by Admin' : 'Cancelled by user',
+                style: GoogleFonts.poppins(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
         ),
       );
+
 
     case 'expired':
       return Column(
@@ -838,17 +869,19 @@ class RequestCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.schedule, color: Colors.orange, size: 16),
-              const SizedBox(width: 6),
-              Expanded(
+              const SizedBox(width: 8),
+              Flexible(
                 child: Text(
-                  'This request expired due to inactivity',
+                  'Request expired',
                   style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Colors.orange[700],
+                    color: Colors.orange,
                     fontWeight: FontWeight.w500,
+                    fontSize: 12,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -856,15 +889,14 @@ class RequestCard extends StatelessWidget {
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
+            child: OutlinedButton(
               onPressed: () => _reactivateExpiredRequest(context, requestId),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('Reactivate Request', style: TextStyle(fontSize: 12)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2B326B),
-                foregroundColor: Colors.white,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.blue,
+                side: const BorderSide(color: Colors.blue),
                 padding: const EdgeInsets.symmetric(vertical: 8),
               ),
+              child: const Text('Reactivate', style: TextStyle(fontSize: 12)),
             ),
           ),
         ],
@@ -893,6 +925,7 @@ class RequestCard extends StatelessWidget {
     return Icons.inventory_2;
   }
 
+  // FIX 1: Approve Request (Pending -> Approved)
   void _approveRequest(
   BuildContext context,
   int requestId,
@@ -912,9 +945,9 @@ class RequestCard extends StatelessWidget {
           backgroundColor: Colors.green,
         ),
       );
-      onLocalRefresh();
+      onLocalRefresh(); // Refresh current tab first
       await Future.delayed(const Duration(milliseconds: 100));
-      onAction(targetStatus: 'approved');
+      onAction(targetStatus: 'approved'); // Then switch tabs
     }
   } catch (e) {
     if (context.mounted) {
@@ -927,7 +960,6 @@ class RequestCard extends StatelessWidget {
     }
   }
 }
-
   void _showRejectDialog(
   BuildContext context,
   int requestId,
@@ -948,8 +980,9 @@ class RequestCard extends StatelessWidget {
           TextField(
             controller: reasonController,
             decoration: const InputDecoration(
-              labelText: 'Rejection Reason (Optional)',
-              hintText: 'Enter reason for rejection...',
+              labelText: 'Reason *', // <-- CHANGED: Remove (optional)
+              hintText: 'Enter rejection reason',
+              border: OutlineInputBorder(),
             ),
             maxLines: 2,
           ),
@@ -962,44 +995,56 @@ class RequestCard extends StatelessWidget {
         ),
         ElevatedButton(
           onPressed: () async {
-            Navigator.pop(context);
+            // ADDED: Validation
+            if (reasonController.text.trim().isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please provide a rejection reason'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              return;
+            }
+
             try {
               await RequestManagementService.rejectRequest(
                 requestId,
                 borrowerId,
                 equipmentName,
-                // reasonController.text.trim(), // Remove or change to named argument if supported
-              );
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Request rejected successfully!'),
-                    backgroundColor: Colors.red,
-                  ),
+                reason: reasonController.text.trim(),
                 );
-                onLocalRefresh();
-                await Future.delayed(const Duration(milliseconds: 100));
-                onAction(targetStatus: 'cancelled');
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Request rejected successfully!'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  onLocalRefresh(); // Refresh current tab first
+                  await Future.delayed(const Duration(milliseconds: 100));
+                  onAction(targetStatus: 'cancelled'); // Stay on Pending tab, forces refresh
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error rejecting request: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error rejecting request: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            }
-          },
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-          child: const Text('Reject', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
-  );
-}
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Reject', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
+  // FIX 2: Hand Out Equipment (Approved -> Active)
   void _handOutEquipment(
     BuildContext context,
     int requestId,
@@ -1014,8 +1059,9 @@ class RequestCard extends StatelessWidget {
             backgroundColor: Colors.blue,
           ),
         );
-        onLocalRefresh();
-        await Future.delayed(const Duration(milliseconds: 100));
+        // ✅ CORRECT: Request is now 'active', navigate to Active tab
+        onLocalRefresh(); // Refresh current tab first
+      await Future.delayed(const Duration(milliseconds: 100));
         onAction(targetStatus: 'active');
       }
     } catch (e) {
@@ -1030,6 +1076,7 @@ class RequestCard extends StatelessWidget {
     }
   }
 
+  // FIX 3: Mark as Returned (Active -> Returned)
   void _markAsReturned(
     BuildContext context,
     int requestId,
@@ -1060,12 +1107,13 @@ class RequestCard extends StatelessWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Equipment marked as returned successfully!'),
+              content: Text('Equipment marked as returned!'),
               backgroundColor: Colors.green,
             ),
           );
-          onLocalRefresh();
-          await Future.delayed(const Duration(milliseconds: 100));
+          // ✅ CORRECT: Request is now 'returned', navigate to Returned tab
+          onLocalRefresh(); // Refresh current tab first
+      await Future.delayed(const Duration(milliseconds: 100));
           onAction(targetStatus: 'returned');
         }
       } catch (e) {
@@ -1113,6 +1161,7 @@ class RequestCard extends StatelessWidget {
     }
   }
 
+  // FIX 4: Reactivate Expired Request (Expired -> Pending)
   void _reactivateExpiredRequest(BuildContext context, int requestId) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1128,10 +1177,11 @@ class RequestCard extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2B326B),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            child: const Text(
+              'Reactivate',
+              style: TextStyle(color: Colors.white),
             ),
-            child: const Text('Reactivate', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -1148,11 +1198,12 @@ class RequestCard extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Request reactivated successfully!'),
-              backgroundColor: Colors.green,
+              backgroundColor: Colors.blue,
             ),
           );
-          onLocalRefresh();
-          await Future.delayed(const Duration(milliseconds: 100));
+          // ✅ CORRECT: Request is now 'pending', navigate to Pending tab
+          onLocalRefresh(); // Refresh current tab first
+      await Future.delayed(const Duration(milliseconds: 100));
           onAction(targetStatus: 'pending');
         }
       } catch (e) {
@@ -1181,22 +1232,28 @@ class RequestCard extends StatelessWidget {
             children: [
               const Text('Select new return date:'),
               const SizedBox(height: 16),
-              ListTile(
-                title: Text(DateFormat('MMM dd, yyyy').format(selectedDate)),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () async {
-                  final pickedDate = await showDatePicker(
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final date = await showDatePicker(
                     context: context,
                     initialDate: selectedDate,
                     firstDate: DateTime.now(),
-                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                    lastDate: DateTime.now().add(const Duration(days: 30)),
                   );
-                  if (pickedDate != null) {
+                  if (date != null) {
                     setState(() {
-                      selectedDate = pickedDate;
+                      selectedDate = DateTime(
+                        date.year,
+                        date.month,
+                        date.day,
+                        selectedDate.hour,
+                        selectedDate.minute,
+                      );
                     });
                   }
                 },
+                icon: const Icon(Icons.calendar_today),
+                label: Text(DateFormat('MMM dd, yyyy').format(selectedDate)),
               ),
             ],
           ),
@@ -1207,23 +1264,22 @@ class RequestCard extends StatelessWidget {
             ),
             ElevatedButton(
               onPressed: () async {
-                Navigator.pop(context);
                 try {
-                  await supabase
-                      .from('borrow_requests')
-                      .update({'return_date': selectedDate.toIso8601String()})
-                      .eq('request_id', requestId);
-
+                  await RequestManagementService.extendBorrowing(
+                    requestId,
+                    selectedDate,
+                  );
                   if (context.mounted) {
+                    Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Borrowing period extended successfully!'),
-                        backgroundColor: Colors.green,
+                        content: Text('Borrowing period extended!'),
+                        backgroundColor: Colors.blue,
                       ),
                     );
-                    onLocalRefresh();
-                    await Future.delayed(const Duration(milliseconds: 100));
-                    onAction(targetStatus: 'active');
+                    onLocalRefresh(); // Refresh current tab first
+      await Future.delayed(const Duration(milliseconds: 100));
+                    onAction(targetStatus: 'active'); // Stay on Active tab
                   }
                 } catch (e) {
                   if (context.mounted) {

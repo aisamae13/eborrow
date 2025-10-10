@@ -9,7 +9,6 @@ import 'modify_request_page.dart';
 import 'request_detail_popup.dart';
 import '../../shared/notifications/notification_service.dart';
 
-
 class ActiveBorrowingsPage extends StatefulWidget {
   const ActiveBorrowingsPage({super.key});
 
@@ -164,7 +163,7 @@ class _ActiveBorrowingsPageState extends State<ActiveBorrowingsPage> {
 
     if (shouldCancel == true) {
       try {
-        // 🆕 NEW: Cancel any active reminders for this request
+        // Cancel any active reminders for this request
         LocalReminderService.cancelRemindersForRequest(request.requestId.toString());
 
         // Create notification about the cancellation
@@ -477,7 +476,6 @@ class _ActiveBorrowingsPageState extends State<ActiveBorrowingsPage> {
             ),
           ),
           const SizedBox(height: 24),
-          // Removed the "Go Back" button
         ],
       ),
     );
@@ -584,12 +582,12 @@ Widget _buildBorrowedItemCard(BorrowRequest item) {
               ),
               const SizedBox(width: 12),
 
-              // Details Column - FIX: Use Expanded here
+              // Details Column
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // FIX: Equipment name and status in Column instead of Row
+                    // Equipment name and status
                     Row(
                       children: [
                         Expanded(
@@ -654,23 +652,25 @@ Widget _buildBorrowedItemCard(BorrowRequest item) {
                       const SizedBox(height: 8),
                     ],
 
-                    // ← ADD THE COUNTDOWN TIMER HERE
-                    if (['approved','active'].contains(item.status.toLowerCase())) ...[
+                    // UPDATED: Include countdown timer for approved, active, AND overdue requests
+                    if (['approved','active','overdue'].contains(item.status.toLowerCase())) ...[
                       const SizedBox(height: 8),
                       BorrowCountdownTimer(
                         borrowDate: item.borrowDate,
                         returnDate: item.returnDate,
                         compact: false,
                         onFinished: () {
-                          // Optional: pwede kang mag-refresh kapag lumipas na ang return date
-                          setState(() { 
-                            _requestsFuture = _fetchActiveRequests(); 
-                          });
+                          // Auto-refresh when countdown reaches zero (transitions from active to overdue)
+                          if (mounted && item.status.toLowerCase() != 'overdue') {
+                            setState(() { 
+                              _requestsFuture = _fetchActiveRequests(); 
+                            });
+                          }
                         },
                       ),
                     ],
 
-                    // FIX: Requested date with proper overflow handling
+                    // Requested date
                     Row(
                       children: [
                         Icon(Icons.schedule, size: 14, color: Colors.grey[600]),
@@ -691,7 +691,7 @@ Widget _buildBorrowedItemCard(BorrowRequest item) {
 
                     const SizedBox(height: 4),
 
-                    // FIX: Due date with proper overflow handling
+                    // Due date information
                     _buildDateInfo(item, dateTimeFormatter, statusColor),
                   ],
                 ),
@@ -702,7 +702,6 @@ Widget _buildBorrowedItemCard(BorrowRequest item) {
           // Action Buttons for pending requests only
           if (isPending) ...[
             const Divider(height: 24),
-            // FIX: Buttons in responsive layout
             Row(
               children: [
                 Expanded(

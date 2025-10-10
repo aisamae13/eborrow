@@ -57,6 +57,15 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
   }
 
   Future<void> _selectTime(BuildContext context) async {
+    // Calculate the maximum allowed time (4 hours from now)
+    final DateTime now = DateTime.now();
+    final DateTime maxTime = now.add(const Duration(hours: 4));
+    
+    // If the selected date is today, we need to check time restrictions
+    final bool isToday = _returnDate.year == now.year && 
+                         _returnDate.month == now.month && 
+                         _returnDate.day == now.day;
+
     final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_returnDate),
@@ -66,14 +75,14 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
             timePickerTheme: TimePickerThemeData(
               // Change the background color of the AM/PM toggle
               dayPeriodColor: WidgetStateColor.resolveWith(
-                (states) => states.contains(MaterialState.selected)
+                (states) => states.contains(WidgetState.selected)
                     ? Color(0xFF2B326B) // Selected AM/PM background color
                     : Colors.grey[200] ??
                           Colors.grey, // Unselected AM/PM background color
               ),
               // Change the text color of the AM/PM text
-              dayPeriodTextColor: MaterialStateColor.resolveWith(
-                (states) => states.contains(MaterialState.selected)
+              dayPeriodTextColor: WidgetStateColor.resolveWith(
+                (states) => states.contains(WidgetState.selected)
                     ? Colors
                           .white // Selected AM/PM text color
                     : Colors.black, // Unselected AM/PM text color
@@ -90,14 +99,62 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
     );
 
     if (pickedTime != null && mounted) {
+      final DateTime newReturnDate = DateTime(
+        _returnDate.year,
+        _returnDate.month,
+        _returnDate.day,
+        pickedTime.hour,
+        pickedTime.minute,
+      );
+
+      // Check if the selected time is within the 4-hour limit when it's today
+      if (isToday) {
+        if (newReturnDate.isAfter(maxTime)) {
+          // Show error if time exceeds 4-hour limit
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Return time cannot be more than 4 hours from now.\nMaximum time today: ${DateFormat('hh:mm a').format(maxTime)}',
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          return; // Don't update the time
+        }
+        
+        // Check if the selected time is in the past
+        if (newReturnDate.isBefore(now.add(const Duration(minutes: 15)))) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Return time must be at least 15 minutes from now.',
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          return; // Don't update the time
+        }
+      } else {
+        // For future dates, just check that it's not in the past
+        if (newReturnDate.isBefore(now)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Return time cannot be in the past.',
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          return; // Don't update the time
+        }
+      }
+
+      // If all validations pass, update the return date
       setState(() {
-        _returnDate = DateTime(
-          _returnDate.year,
-          _returnDate.month,
-          _returnDate.day,
-          pickedTime.hour,
-          pickedTime.minute,
-        );
+        _returnDate = newReturnDate;
       });
     }
   }
@@ -208,7 +265,7 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Equipment Name - Responsive text
-                    Container(
+                    SizedBox(
                       width: double.infinity,
                       child: Text(
                         widget.request.equipmentName,
@@ -239,6 +296,37 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
                             '${dateFormat.format(_returnDate)} at ${timeFormat.format(_returnDate)}',
                             isSmallScreen,
                           ),
+                          
+                          // ADD TIME LIMIT INFO
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.blue[200]!),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                  Icons.info_outline,
+                                  size: 16,
+                                  color: Colors.blue[700],
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Maximum borrow time: 4 hours from current time',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      color: Colors.blue[700],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          
                           const SizedBox(height: 12),
 
                           // Responsive button layout

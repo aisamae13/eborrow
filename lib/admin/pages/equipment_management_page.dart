@@ -4,6 +4,7 @@ import '../services/equipment_management_service.dart';
 import '../widgets/equipmeent_card.dart';
 import '../widgets/add_equipment_dialog.dart';
 import '../widgets/edit_equipment_dialog.dart';
+import '../ArchiveEquipments/archived_equipment_page.dart'; // Add this import
 
 class EquipmentManagementPage extends StatefulWidget {
   const EquipmentManagementPage({super.key});
@@ -52,6 +53,16 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
     );
   }
 
+  // Add this method to navigate to archived equipment page
+  void _navigateToArchivedEquipment() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ArchivedEquipmentPage(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -68,6 +79,12 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
         ),
         backgroundColor: const Color(0xFF2B326B),
         actions: [
+          // Archive Equipment Button - Add this
+          IconButton(
+            icon: const Icon(Icons.archive, color: Colors.white),
+            onPressed: _navigateToArchivedEquipment,
+            tooltip: 'View Archived Equipment',
+          ),
           // Toggle Grid/List View
           IconButton(
             icon: Icon(
@@ -230,7 +247,7 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
                     final categories = ['all', ...?snapshot.data];
 
                     return DropdownButtonFormField<String>(
-                      value: _selectedCategory,
+                      initialValue: _selectedCategory,
                       decoration: InputDecoration(
                         labelText: 'Category',
                         border: OutlineInputBorder(
@@ -273,7 +290,7 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
               Expanded(
                 flex: 1, // ✅ Added flex to control space distribution
                 child: DropdownButtonFormField<String>(
-                  value: _selectedStatus,
+                  initialValue: _selectedStatus,
                   decoration: InputDecoration(
                     labelText: 'Status',
                     border: OutlineInputBorder(
@@ -384,12 +401,11 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
         return EquipmentCard(
           equipment: equipment[index],
           onEdit: () => _showEditDialog(equipment[index]),
-          onDelete: () => _showDeleteDialog(equipment[index]),
+          onArchive: () => _showArchiveDialog(equipment[index]),
           onStatusChange: (newStatus) =>
               _changeEquipmentStatus(equipment[index], newStatus),
           onRefresh: _loadData,
           onShowMessage: (message, isSuccess) {
-            // Add this
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(message),
@@ -412,12 +428,11 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
           equipment: equipment[index],
           isListView: true,
           onEdit: () => _showEditDialog(equipment[index]),
-          onDelete: () => _showDeleteDialog(equipment[index]),
+          onArchive: () => _showArchiveDialog(equipment[index]),
           onStatusChange: (newStatus) =>
               _changeEquipmentStatus(equipment[index], newStatus),
           onRefresh: _loadData,
           onShowMessage: (message, isSuccess) {
-            // Add this line
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(message),
@@ -441,30 +456,50 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
     );
   }
 
-  void _showDeleteDialog(Map<String, dynamic> equipment) {
+  void _showArchiveDialog(Map<String, dynamic> equipment) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Equipment'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.archive_outlined, color: Colors.orange[700], size: 28),
+            const SizedBox(width: 12),
+            Text(
+              'Archive Equipment',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
         content: Text(
-          'Are you sure you want to delete "${equipment['name']}"?\n\nThis action cannot be undone.',
+          'Are you sure you want to archive "${equipment['name']}"?\n\nArchived equipment will be marked as retired and cannot be borrowed.',
+          style: GoogleFonts.poppins(fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
               try {
-                await EquipmentManagementService.deleteEquipment(
+                await EquipmentManagementService.archiveEquipment(
                   equipment['equipment_id'],
                 );
                 if (mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Equipment deleted successfully!'),
+                    SnackBar(
+                      content: Text('Equipment "${equipment['name']}" archived successfully!'),
                       backgroundColor: Colors.green,
                     ),
                   );
@@ -473,17 +508,32 @@ class _EquipmentManagementPageState extends State<EquipmentManagementPage> {
               } catch (e) {
                 if (mounted) {
                   Navigator.pop(context);
+                  String errorMessage = e.toString();
+                  if (errorMessage.startsWith('Exception: ')) {
+                    errorMessage = errorMessage.substring(11);
+                  }
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Error deleting equipment: $e'),
+                      content: Text(errorMessage),
                       backgroundColor: Colors.red,
                     ),
                   );
                 }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Archive',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),

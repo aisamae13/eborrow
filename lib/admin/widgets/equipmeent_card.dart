@@ -2,14 +2,14 @@ import 'package:eborrow/admin/services/equipment_management_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Add this import
 import '../pages/equipment_issues_page.dart';
-import '../services/equipment_management_service.dart';
 
 class EquipmentCard extends StatelessWidget {
   final Map<String, dynamic> equipment;
   final bool isListView;
   final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback onArchive; // Changed from onDelete to onArchive
   final Function(String) onStatusChange;
   final VoidCallback onRefresh;
   final Function(String, bool)? onShowMessage;
@@ -19,7 +19,7 @@ class EquipmentCard extends StatelessWidget {
     required this.equipment,
     this.isListView = false,
     required this.onEdit,
-    required this.onDelete,
+    required this.onArchive, // Changed parameter name
     required this.onStatusChange,
     required this.onRefresh,
     this.onShowMessage,
@@ -69,7 +69,9 @@ class EquipmentCard extends StatelessWidget {
 
   Future<int> _getIssueCount(int equipmentId) async {
     try {
-      final response = await supabase
+      // Import the main.dart file to access the supabase instance
+      // or use Supabase.instance.client directly
+      final response = await Supabase.instance.client
           .from('issues')
           .select('issue_id')
           .eq('equipment_id', equipmentId)
@@ -240,7 +242,7 @@ class EquipmentCard extends StatelessWidget {
                                 iconSize,
                                 buttonLabelSize,
                               ),
-                              // ADD ISSUES BUTTON HERE
+                              // Issues button
                               FutureBuilder<int>(
                                 future: _getIssueCount(equipmentId),
                                 builder: (context, snapshot) {
@@ -269,7 +271,7 @@ class EquipmentCard extends StatelessWidget {
                                           top: -4,
                                           child: Container(
                                             padding: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
+                                            decoration: const BoxDecoration(
                                               color: Colors.red,
                                               shape: BoxShape.circle,
                                             ),
@@ -728,7 +730,6 @@ class EquipmentCard extends StatelessWidget {
     int equipmentId,
     String equipmentName,
   ) {
-    // ✅ FIX: Use the actual QR code from the database
     final qrCode =
         equipment['qr_code'] ??
         'UNKNOWN-${equipmentId.toString().padLeft(3, '0')}';
@@ -745,12 +746,10 @@ class EquipmentCard extends StatelessWidget {
         child: Container(
           width: dialogWidth,
           constraints: BoxConstraints(
-            maxHeight:
-                MediaQuery.of(context).size.height * 0.85, // Add max height
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
           ),
           padding: const EdgeInsets.all(24),
           child: SingleChildScrollView(
-            // ✅ Add scroll capability
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -888,7 +887,7 @@ class EquipmentCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+      );
   }
 
   // Helper method for info rows
@@ -981,15 +980,15 @@ class EquipmentCard extends StatelessWidget {
               onEdit();
             }),
             _buildOptionItem(
-              Icons.delete,
-              'Delete Equipment',
-              Colors.red,
+              Icons.archive_outlined, // Changed icon
+              'Archive Equipment', // Changed text
+              Colors.orange, // Changed color
               () async {
-                print('🔴 Delete Equipment tapped'); // Debug print
+                print('🟠 Archive Equipment tapped'); // Updated debug print
                 Navigator.pop(context); // Close the options menu first
-                await _handleEquipmentDeletion(
+                await _handleEquipmentArchiving( // Updated method name
                   context,
-                ); // Make sure this is called
+                ); 
               },
             ),
 
@@ -1001,7 +1000,7 @@ class EquipmentCard extends StatelessWidget {
     );
   }
 
-  Future<void> _handleEquipmentDeletion(BuildContext context) async {
+  Future<void> _handleEquipmentArchiving(BuildContext context) async { // Renamed method
     final equipmentId = equipment['equipment_id'];
     final equipmentName = equipment['name'] ?? 'this equipment';
 
@@ -1012,10 +1011,10 @@ class EquipmentCard extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red[700], size: 28),
+            Icon(Icons.archive_outlined, color: Colors.orange[700], size: 28), // Changed icon and color
             const SizedBox(width: 12),
             Text(
-              'Delete Equipment',
+              'Archive Equipment', // Changed title
               style: GoogleFonts.poppins(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
@@ -1024,7 +1023,7 @@ class EquipmentCard extends StatelessWidget {
           ],
         ),
         content: Text(
-          'Are you sure you want to delete "$equipmentName"?\n\nThis action cannot be undone.',
+          'Are you sure you want to archive "$equipmentName"?\n\nArchived equipment will be marked as retired and cannot be borrowed.', // Updated message
           style: GoogleFonts.poppins(fontSize: 14),
         ),
         actions: [
@@ -1041,13 +1040,13 @@ class EquipmentCard extends StatelessWidget {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: Colors.orange, // Changed color
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
             child: Text(
-              'Delete',
+              'Archive', // Changed button text
               style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
@@ -1061,15 +1060,15 @@ class EquipmentCard extends StatelessWidget {
     if (confirmed != true) return;
 
     try {
-      // Delete the equipment using the service
-      await EquipmentManagementService.deleteEquipment(equipmentId);
+      // Archive the equipment using the service
+      await EquipmentManagementService.archiveEquipment(equipmentId); // Updated method call
 
       // Refresh the list
       onRefresh();
 
       // Show success message via callback
       onShowMessage?.call(
-        'Equipment "$equipmentName" deleted successfully!',
+        'Equipment "$equipmentName" archived successfully!', // Updated success message
         true,
       );
     } catch (e) {
@@ -1084,7 +1083,7 @@ class EquipmentCard extends StatelessWidget {
       // Remove any other technical prefixes
       if (errorMessage.toLowerCase().contains('postgrestexception')) {
         errorMessage =
-            'Unable to delete this equipment due to database constraints. Please contact support.';
+            'Unable to archive this equipment due to database constraints. Please contact support.'; // Updated error message
       }
 
       // Show error message via callback

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/recent_activities_widget.dart';
-import '../widgets/add_equipment_dialog.dart'; // Add this import
+// Add this import
 import '../services/admin_dashboard_service.dart';
 import '../services/admin_auth_service.dart';
 import 'package:provider/provider.dart';

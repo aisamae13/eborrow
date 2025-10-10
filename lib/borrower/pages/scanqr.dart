@@ -7,7 +7,7 @@ import '../models/equipment_model.dart'; // This is the correct import
 import 'equipment_detail_page.dart';
 
 class ScanQRPage extends StatefulWidget {
-  const ScanQRPage({Key? key}) : super(key: key);
+  const ScanQRPage({super.key});
 
   @override
   State<ScanQRPage> createState() => _ScanQRPageState();

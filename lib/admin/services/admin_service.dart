@@ -1,7 +1,7 @@
 // admin_service.dart
 
-import '/main.dart';
 import 'package:flutter/material.dart';
+import '/main.dart';
 
 class AdminService {
   /// Toggle user suspension status
@@ -10,14 +10,18 @@ class AdminService {
       debugPrint('${suspend ? "Suspending" : "Unsuspending"} user: $userId');
 
       // First, get user details for logging
-      final userProfile = await supabase
+      final userProfileResponse = await supabase
           .from('user_profiles')
           .select('email, first_name, last_name')
           .eq('id', userId)
-          .single();
+          .maybeSingle(); // Use maybeSingle() to handle cases where user doesn't exist
 
-      final userEmail = userProfile['email'] ?? 'Unknown';
-      final userName = '${userProfile['first_name'] ?? ''} ${userProfile['last_name'] ?? ''}'.trim();
+      if (userProfileResponse == null) {
+        throw 'User not found';
+      }
+
+      final userEmail = userProfileResponse['email'] ?? 'Unknown';
+      final userName = '${userProfileResponse['first_name'] ?? ''} ${userProfileResponse['last_name'] ?? ''}'.trim();
 
       // Update suspension status
       await supabase
@@ -41,78 +45,90 @@ class AdminService {
     }
   }
 
-  /// Delete a borrower account by calling the Edge Function
+  /// Deletes a borrower account and logs the admin action
   static Future<void> deleteBorrowerAccount(String userId) async {
     try {
-      debugPrint('Calling Edge Function to delete user: $userId');
-
-      // Get user details for logging before deletion
-      final userProfile = await supabase
+      // Get user details before deletion for logging purposes
+      final userDetailsResponse = await supabase
           .from('user_profiles')
-          .select('email, first_name, last_name')
+          .select('first_name, last_name, email')
           .eq('id', userId)
-          .single();
-
-      final userEmail = userProfile['email'] ?? 'Unknown';
-      final userName = '${userProfile['first_name'] ?? ''} ${userProfile['last_name'] ?? ''}'.trim();
-
-      // Get current user's access token
-      final session = supabase.auth.currentSession;
-      if (session == null) {
-        throw Exception('No active session');
+          .maybeSingle(); // Use maybeSingle() instead of single()
+      
+      if (userDetailsResponse == null) {
+        throw 'User not found or already deleted';
       }
-
-      final response = await supabase.functions.invoke(
-        'delete-user',
-        body: {'userId': userId},
-        headers: {
-          'Authorization': 'Bearer ${session.accessToken}',
-        },
-      );
-
-      debugPrint('Edge Function response status: ${response.status}');
-      debugPrint('Edge Function response data: ${response.data}');
-
-      if (response.status != 200) {
-        final errorMessage = response.data is Map
-            ? (response.data['error'] ?? 'Failed to delete user')
-            : 'Failed to delete user';
-        throw Exception(errorMessage);
-      }
-
-      // Log the deletion
+      
+      final firstName = userDetailsResponse['first_name'] as String? ?? '';
+      final lastName = userDetailsResponse['last_name'] as String? ?? '';
+      final email = userDetailsResponse['email'] as String? ?? '';
+      final fullName = '$firstName $lastName'.trim();
+      
+      // Delete operations in the correct order (without transactions for now)
+      
+      // 1. Delete user's notifications
+      await supabase.from('notifications')
+          .delete()
+          .eq('user_id', userId);
+      
+      // 2. Cancel user's pending/approved borrow requests (use the correct syntax)
+      await supabase.from('borrow_requests')
+          .update({'status': 'cancelled'})
+          .eq('borrower_id', userId)
+          .inFilter('status', ['pending', 'approved']); // Fixed: use inFilter() instead of in_()
+      
+      // 3. Log the admin action BEFORE deleting the profile
       await supabase.from('admin_activity_logs').insert({
         'admin_id': supabase.auth.currentUser!.id,
         'action_type': 'delete',
         'target_user_id': userId,
-        'target_user_email': userEmail,
-        'target_user_name': userName,
-        'details': 'User account permanently deleted',
+        'target_user_email': email,
+        'target_user_name': fullName,
+        'details': 'User account deleted by admin',
+        'metadata': {
+          'timestamp': DateTime.now().toIso8601String(),
+        }
       });
-
-      debugPrint('User deletion completed successfully.');
+      
+      // 4. Delete user profile
+      await supabase.from('user_profiles')
+          .delete()
+          .eq('id', userId);
+      
+      // 5. Finally, delete the user from auth system (if using admin API)
+      try {
+        await supabase.auth.admin.deleteUser(userId);
+      } catch (e) {
+        debugPrint('Warning: Could not delete user from auth system: $e');
+        // Continue anyway as the profile is already deleted
+      }
+      
+      debugPrint('User account deleted successfully');
+      
     } catch (e) {
-      debugPrint('Error calling delete-user Edge Function: $e');
-      rethrow;
+      debugPrint('Error deleting user: $e');
+      throw 'Failed to delete user: $e';
     }
   }
 
-  /// Alternative: Soft delete (recommended for data retention)
-  static Future<void> softDeleteBorrowerAccount(String userId) async {
+  /// Reset user password by sending reset email
+  static Future<void> resetUserPassword(String email) async {
     try {
-      debugPrint('Soft deleting user: $userId');
-
-      await supabase
-          .from('user_profiles')
-          .update({
-            'deleted_at': DateTime.now().toIso8601String(),
-            'is_suspended': true,
-          })
-          .eq('id', userId);
-
-      debugPrint('User soft deleted successfully.');
+      await supabase.auth.resetPasswordForEmail(email);
+      
+      // Log the admin action
+      await supabase.from('admin_activity_logs').insert({
+        'admin_id': supabase.auth.currentUser!.id,
+        'action_type': 'reset_password',
+        'target_user_email': email,
+        'details': 'Password reset email sent by admin',
+        'metadata': {
+          'timestamp': DateTime.now().toIso8601String(),
+        }
+      });
+      
     } catch (e) {
-      debugPrint('Error soft deleting user: $e');
+      debugPrint('Error resetting password: $e');
       rethrow;
     }
   }

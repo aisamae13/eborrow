@@ -473,7 +473,7 @@ class _EditEquipmentDialogState extends State<EditEquipmentDialog> {
                             return Column(
                               children: [
                                 DropdownButtonFormField<String>(
-                                  value: _selectedCategory,
+                                  initialValue: _selectedCategory,
                                   decoration: InputDecoration(
                                     labelText: 'Category *',
                                     border: OutlineInputBorder(
@@ -503,7 +503,7 @@ class _EditEquipmentDialogState extends State<EditEquipmentDialog> {
                                 ),
                                 const SizedBox(height: 16),
                                 DropdownButtonFormField<String>(
-                                  value: _selectedStatus,
+                                  initialValue: _selectedStatus,
                                   decoration: InputDecoration(
                                     labelText: 'Status *',
                                     border: OutlineInputBorder(
@@ -539,7 +539,7 @@ class _EditEquipmentDialogState extends State<EditEquipmentDialog> {
                               children: [
                                 Expanded(
                                   child: DropdownButtonFormField<String>(
-                                    value: _selectedCategory,
+                                    initialValue: _selectedCategory,
                                     decoration: InputDecoration(
                                       labelText: 'Category *',
                                       border: OutlineInputBorder(
@@ -572,7 +572,7 @@ class _EditEquipmentDialogState extends State<EditEquipmentDialog> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: DropdownButtonFormField<String>(
-                                    value: _selectedStatus,
+                                    initialValue: _selectedStatus,
                                     decoration: InputDecoration(
                                       labelText: 'Status *',
                                       border: OutlineInputBorder(

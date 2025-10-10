@@ -7,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 /// Behavior:
 /// - If now < borrowDate  => counts down "Starts in"
 /// - Else if now < returnDate => counts down "Time left"
-/// - Else => shows "Overdue by ..."
+/// - Else => shows "Overdue by ..." (STOPS AUTO-REFRESHING)
 class BorrowCountdownTimer extends StatefulWidget {
   final DateTime borrowDate;
   final DateTime returnDate;
@@ -43,35 +43,57 @@ class BorrowCountdownTimer extends StatefulWidget {
 }
 
 class _BorrowCountdownTimerState extends State<BorrowCountdownTimer> {
-  late Timer _timer;
+  Timer? _timer;
   late DateTime _now;
+  bool _hasCalledOnFinished = false;
+  bool _isOverdue = false;
 
   @override
   void initState() {
     super.initState();
     _now = DateTime.now();
-    _startTimer();
+    _checkIfOverdue();
+    
+    // Only start timer if not already overdue
+    if (!_isOverdue) {
+      _startTimer();
+    }
+  }
+
+  void _checkIfOverdue() {
+    _isOverdue = _now.isAfter(widget.returnDate);
   }
 
   void _startTimer() {
     _timer = Timer.periodic(widget.tick, (_) {
       if (!mounted) return;
+      
+      final newNow = DateTime.now();
+      
+      // Check if we just became overdue
+      final wasOverdue = _isOverdue;
+      _isOverdue = newNow.isAfter(widget.returnDate);
+      
       setState(() {
-        _now = DateTime.now();
+        _now = newNow;
       });
 
-      // If both phases done (past return) call finish once
-      if (_now.isAfter(widget.returnDate) && widget.onFinished != null) {
-        // Call only once then nullify
-        final cb = widget.onFinished!;
-        Future.microtask(cb);
+      // If we just became overdue, stop the timer and call onFinished
+      if (!wasOverdue && _isOverdue) {
+        _timer?.cancel();
+        _timer = null;
+        
+        if (!_hasCalledOnFinished && widget.onFinished != null) {
+          _hasCalledOnFinished = true;
+          Future.microtask(widget.onFinished!);
+        }
       }
     });
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -137,24 +159,47 @@ class _BorrowCountdownTimerState extends State<BorrowCountdownTimer> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            phase,
-            style: GoogleFonts.poppins(
-              fontSize: 11,
-              letterSpacing: 0.5,
-              fontWeight: FontWeight.w600,
-              color: isOverdue ? Colors.red : color,
-            ),
+          Row(
+            children: [
+              Text(
+                phase,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  letterSpacing: 0.5,
+                  fontWeight: FontWeight.w600,
+                  color: isOverdue ? Colors.red : color,
+                ),
+              ),
+              // Add indicator when timer is stopped (overdue)
+              if (isOverdue) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'STATIC',
+                    style: GoogleFonts.poppins(
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 4),
-            Wrap(
+          Wrap(
             spacing: 6,
             runSpacing: 6,
             children: [
-              _timeChip('${seg.days}', 'D'),
-              _timeChip('${seg.hours}', 'H'),
-              _timeChip('${seg.minutes}', 'M'),
-              _timeChip('${seg.seconds}', 'S'),
+              _timeChip('${seg.days}', 'D', isOverdue),
+              _timeChip('${seg.hours}', 'H', isOverdue),
+              _timeChip('${seg.minutes}', 'M', isOverdue),
+              _timeChip('${seg.seconds}', 'S', isOverdue),
             ],
           ),
         ],
@@ -185,16 +230,30 @@ class _BorrowCountdownTimerState extends State<BorrowCountdownTimer> {
             color: isOverdue ? Colors.red : color,
           ),
         ),
+        // Add static indicator for compact mode when overdue
+        if (isOverdue) ...[
+          const SizedBox(width: 4),
+          Text(
+            '(STATIC)',
+            style: GoogleFonts.poppins(
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              color: Colors.red.withOpacity(0.7),
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _timeChip(String value, String label) {
+  Widget _timeChip(String value, String label, bool isOverdue) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey.shade300),
+        color: isOverdue ? Colors.red.withOpacity(0.1) : Colors.white,
+        border: Border.all(
+          color: isOverdue ? Colors.red.withOpacity(0.3) : Colors.grey.shade300,
+        ),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -206,13 +265,14 @@ class _BorrowCountdownTimerState extends State<BorrowCountdownTimer> {
               fontSize: 14,
               fontWeight: FontWeight.bold,
               height: 1,
+              color: isOverdue ? Colors.red : Colors.black,
             ),
           ),
           Text(
             label,
             style: GoogleFonts.poppins(
               fontSize: 10,
-              color: Colors.grey[600],
+              color: isOverdue ? Colors.red.withOpacity(0.8) : Colors.grey[600],
               height: 1.1,
             ),
           ),

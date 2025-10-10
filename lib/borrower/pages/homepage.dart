@@ -251,7 +251,7 @@ Widget _buildAvatarImage() {
                                   padding: const EdgeInsets.only(bottom: 12.0),
                                   child: _buildNewEquipmentItem(item),
                                 ))
-                            .toList(),
+                            ,
                         const SizedBox(height: 24),
                       ],
                     );
@@ -284,7 +284,7 @@ Widget _buildAvatarImage() {
                                   padding: const EdgeInsets.only(bottom: 12.0),
                                   child: _buildRecentActivityItem(item),
                                 ))
-                            .toList(),
+                            ,
                         const SizedBox(height: 24),
                       ],
                     );

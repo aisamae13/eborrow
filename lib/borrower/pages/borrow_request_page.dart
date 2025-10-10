@@ -108,14 +108,14 @@ class _BorrowRequestPageState extends State<BorrowRequestPage> {
             timePickerTheme: TimePickerThemeData(
               // Change the background color of the AM/PM toggle
               dayPeriodColor: WidgetStateColor.resolveWith(
-                (states) => states.contains(MaterialState.selected)
+                (states) => states.contains(WidgetState.selected)
                     ? Color(0xFF2B326B) // Selected AM/PM background color
                     : Colors.grey[200] ??
                           Colors.grey, // Unselected AM/PM background color
               ),
               // Change the text color of the AM/PM text
-              dayPeriodTextColor: MaterialStateColor.resolveWith(
-                (states) => states.contains(MaterialState.selected)
+              dayPeriodTextColor: WidgetStateColor.resolveWith(
+                (states) => states.contains(WidgetState.selected)
                     ? Colors
                           .white // Selected AM/PM text color
                     : Colors.black, // Unselected AM/PM text color

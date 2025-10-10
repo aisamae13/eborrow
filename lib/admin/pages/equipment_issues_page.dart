@@ -138,7 +138,7 @@ class _EquipmentIssuesPageState extends State<EquipmentIssuesPage> {
                           Text(
                             _selectedFilter == 'all'
                                 ? 'This equipment has no reported issues'
-                                : 'No ${_selectedFilter} issues',
+                                : 'No $_selectedFilter issues',
                             style: GoogleFonts.poppins(color: Colors.grey[500]),
                           ),
                         ],

@@ -3,7 +3,7 @@ import 'loginpage.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class LandingPage extends StatelessWidget {
-  const LandingPage({Key? key}) : super(key: key);
+  const LandingPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +46,7 @@ class LandingPage extends StatelessWidget {
                           double logoWidth = constraints.maxWidth > 300
                               ? 300
                               : constraints.maxWidth - 20;
-                          return Container(
+                          return SizedBox(
                             width: logoWidth,
                             height: 130,
                             child: Image.asset(

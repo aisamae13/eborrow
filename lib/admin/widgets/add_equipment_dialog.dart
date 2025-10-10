@@ -255,7 +255,7 @@ class _AddEquipmentDialogState extends State<AddEquipmentDialog> {
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _selectedCategory,
+                              initialValue: _selectedCategory,
                               decoration: InputDecoration(
                                 labelText: 'Category *',
                                 border: OutlineInputBorder(
@@ -295,7 +295,7 @@ class _AddEquipmentDialogState extends State<AddEquipmentDialog> {
 
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _selectedStatus,
+                              initialValue: _selectedStatus,
                               decoration: InputDecoration(
                                 labelText: 'Status *',
                                 border: OutlineInputBorder(
@@ -396,7 +396,7 @@ class _AddEquipmentDialogState extends State<AddEquipmentDialog> {
                               _selectedImage == null
                                   ? 'Choose Image'
                                   // Display the full path, but trim the file name if it's too long
-                                  : 'Selected: ${_selectedImage!.name.length > 30 ? _selectedImage!.name.substring(0, 15) + '...' + _selectedImage!.name.substring(_selectedImage!.name.length - 10) : _selectedImage!.name}',
+                                  : 'Selected: ${_selectedImage!.name.length > 30 ? '${_selectedImage!.name.substring(0, 15)}...${_selectedImage!.name.substring(_selectedImage!.name.length - 10)}' : _selectedImage!.name}',
                               overflow: TextOverflow.ellipsis,
                             ),
                             style: OutlinedButton.styleFrom(
