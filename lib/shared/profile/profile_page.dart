@@ -825,6 +825,129 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  void _showDeleteAccountConfirmationDialog() {
+    final confirmController = TextEditingController();
+    showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.warning_amber_rounded, size: 56, color: Colors.red),
+                const SizedBox(height: 12),
+                Text(
+                  'Delete Account',
+                  style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'This action will sign you out and cannot be undone from the app. '
+                  'If your account needs to be fully removed from the authentication system '
+                  'it must be processed server-side. To continue, type DELETE below.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmController,
+                  decoration: const InputDecoration(
+                    hintText: 'Type DELETE to confirm',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                        ),
+                        onPressed: () {
+                          final text = confirmController.text.trim();
+                          if (text != 'DELETE') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please type DELETE to confirm.'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          Navigator.of(context).pop(true);
+                        },
+                        child: const Text('Delete Account'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ).then((confirmed) {
+      if (confirmed == true) {
+        _deleteAccount();
+      }
+    });
+  }
+
+  Future<void> _deleteAccount() async {
+    setState(() => _isLoading = true);
+    try {
+      final user = supabase.auth.currentUser;
+      final userId = user?.id;
+      if (userId == null) throw 'User not found.';
+
+      // Since we can't delete the auth user from the client side,
+      // we'll mark the profile as suspended (soft delete)
+      await supabase
+          .from('user_profiles')
+          .update({'is_suspended': true})
+          .eq('id', userId);
+
+      // Sign out the user
+      await supabase.auth.signOut();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account has been deactivated. Contact admin for complete removal.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LandingPage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error during account deletion: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deactivating account: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -854,6 +977,12 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     );
                   },
+                ),
+                _buildOptionTile(
+                  icon: Icons.delete_outline,
+                  title: 'Delete Account',
+                  onTap: _showDeleteAccountConfirmationDialog,
+                  isDestructive: true,
                 ),
                 _buildOptionTile(
                   icon: Icons.logout,
