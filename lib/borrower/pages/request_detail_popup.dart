@@ -66,6 +66,7 @@ void showRequestDetailPopup(BuildContext context, BorrowRequest item) {
               BorrowCountdownTimer(
                 borrowDate: item.borrowDate,
                 returnDate: item.returnDate,
+                status: item.status, // Pass the required status parameter
                 compact: false,
                 onFinished: () {
                   // Optional: Close popup and refresh parent when status changes

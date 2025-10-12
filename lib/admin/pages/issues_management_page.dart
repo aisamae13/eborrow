@@ -60,22 +60,29 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text(
           'Issue Reports',
           style: GoogleFonts.poppins(
             fontSize: 24,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
             color: Colors.white,
           ),
         ),
         backgroundColor: const Color(0xFF2B326B),
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(4.0),
+          child: Container(color: const Color(0xFFFFC107), height: 4.0),
+        ),
       ),
       body: Column(
         children: [
+          const SizedBox(height: 16), // 🎨 Top spacing
           _buildFilterBar(),
+          const SizedBox(height: 16), // 🎨 Spacing
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async => _loadIssues(),
@@ -83,64 +90,50 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
                 future: _issuesFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6E8F0),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0xFFBCC0D0),
+                              offset: Offset(6, 6),
+                              blurRadius: 12,
+                            ),
+                            BoxShadow(
+                              color: Colors.white,
+                              offset: Offset(-6, -6),
+                              blurRadius: 12,
+                            ),
+                          ],
+                        ),
+                        child: const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2B326B)),
+                        ),
+                      ),
+                    );
                   }
 
                   if (snapshot.hasError) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Error loading issues',
-                            style: GoogleFonts.poppins(fontSize: 16),
-                          ),
-                          const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: _loadIssues,
-                            child: const Text('Retry'),
-                          ),
-                        ],
-                      ),
-                    );
+                    return _buildErrorState();
                   }
 
                   final issues = snapshot.data ?? [];
 
                   if (issues.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.check_circle_outline, size: 80, color: Colors.grey[400]),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No issues found',
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _selectedFilter == 'all'
-                                ? 'No reported issues yet'
-                                : 'No $_selectedFilter issues',
-                            style: GoogleFonts.poppins(color: Colors.grey[500]),
-                          ),
-                        ],
-                      ),
-                    );
+                    return _buildEmptyState();
                   }
 
                   return ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 20), // 🎨 Consistent padding
                     itemCount: issues.length,
                     itemBuilder: (context, index) {
-                      return _buildIssueCard(issues[index]);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16), // 🎨 Consistent spacing
+                        child: _buildIssueCard(issues[index]),
+                      );
                     },
                   );
                 },
@@ -154,33 +147,48 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
 
   Widget _buildFilterBar() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      color: Colors.white,
-      child: Row(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6E8F0),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xFFBCC0D0),
+            offset: Offset(3, 3),
+            blurRadius: 8,
+          ),
+          BoxShadow(
+            color: Colors.white,
+            offset: Offset(-3, -3),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Filter:',
+            'Filter Issues',
             style: GoogleFonts.poppins(
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
+              color: const Color(0xFF2B326B),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildFilterChip('All', 'all'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Open', 'open'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('In Progress', 'in_progress'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Resolved', 'resolved'),
-                ],
-              ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterChip('All', 'all'),
+                const SizedBox(width: 8),
+                _buildFilterChip('Open', 'open'),
+                const SizedBox(width: 8),
+                _buildFilterChip('In Progress', 'in_progress'),
+                const SizedBox(width: 8),
+                _buildFilterChip('Resolved', 'resolved'),
+              ],
             ),
           ),
         ],
@@ -190,22 +198,187 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
 
   Widget _buildFilterChip(String label, String value) {
     final isSelected = _selectedFilter == value;
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
+    return GestureDetector(
+      onTap: () {
         setState(() {
           _selectedFilter = value;
         });
         _loadIssues();
       },
-      backgroundColor: Colors.grey[100],
-      selectedColor: const Color(0xFF2B326B).withOpacity(0.2),
-      checkmarkColor: const Color(0xFF2B326B),
-      labelStyle: GoogleFonts.poppins(
-        color: isSelected ? const Color(0xFF2B326B) : Colors.grey[700],
-        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-        fontSize: 13,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFDEE2F0) : const Color(0xFFE6E8F0),
+          borderRadius: BorderRadius.circular(20),
+          border: isSelected
+              ? Border.all(color: const Color(0xFF2B326B), width: 1.5)
+              : null,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF2B326B).withOpacity(0.13),
+                    offset: const Offset(2, 2),
+                    blurRadius: 6,
+                  ),
+                  const BoxShadow(
+                    color: Colors.white,
+                    offset: Offset(-2, -2),
+                    blurRadius: 6,
+                  ),
+                ]
+              : [
+                  const BoxShadow(
+                    color: Color(0xFFBCC0D0),
+                    offset: Offset(2, 2),
+                    blurRadius: 6,
+                  ),
+                  const BoxShadow(
+                    color: Colors.transparent,
+                    offset: Offset(-2, -2),
+                    blurRadius: 6,
+                  ),
+                ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _getFilterIcon(value),
+              size: 16,
+              color: isSelected ? const Color(0xFF2B326B) : const Color(0xFF2B326B).withOpacity(0.7),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                color: const Color(0xFF2B326B),
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                fontSize: 13.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getFilterIcon(String filter) {
+    switch (filter) {
+      case 'all':
+        return Icons.list_alt;
+      case 'open':
+        return Icons.error_outline;
+      case 'in_progress':
+        return Icons.pending_outlined;
+      case 'resolved':
+        return Icons.check_circle_outline;
+      default:
+        return Icons.filter_list;
+    }
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE6E8F0),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0xFFBCC0D0),
+              offset: Offset(6, 6),
+              blurRadius: 12,
+            ),
+            BoxShadow(
+              color: Colors.white,
+              offset: Offset(-6, -6),
+              blurRadius: 12,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
+            const SizedBox(height: 16),
+            Text(
+              'Error loading issues',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF2B326B),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _loadIssues,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2B326B),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE6E8F0),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0xFFBCC0D0),
+              offset: Offset(6, 6),
+              blurRadius: 12,
+            ),
+            BoxShadow(
+              color: Colors.white,
+              offset: Offset(-6, -6),
+              blurRadius: 12,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check_circle_outline,
+              size: 80,
+              color: const Color(0xFF2B326B).withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No issues found',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF2B326B),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _selectedFilter == 'all'
+                  ? 'No reported issues yet'
+                  : 'No $_selectedFilter issues',
+              style: GoogleFonts.poppins(
+                color: const Color(0xFF2B326B).withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -218,166 +391,265 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
     final createdAt = DateTime.parse(issue['created_at']);
     final timeAgo = _getTimeAgo(createdAt);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(_getStatusIcon(status), size: 14, color: statusColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatStatus(status),
-                        style: GoogleFonts.poppins(
-                          color: statusColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  timeAgo,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.inventory_2_outlined, size: 20, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    equipment?['name'] ?? 'Unknown Equipment',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF2B326B),
+    return Container(
+      padding: const EdgeInsets.all(16), // 🔧 Same padding as original
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6E8F0), // 🎨 Neumorphic background
+        borderRadius: BorderRadius.circular(16), // 🎨 Rounded corners
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xFFBCC0D0),
+            offset: Offset(6, 6),
+            blurRadius: 12,
+          ),
+          BoxShadow(
+            color: Colors.white,
+            offset: Offset(-6, -6),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE6E8F0),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    // 🎨 Inner neumorphic effect for status badge
+                    BoxShadow(
+                      color: const Color(0xFFBCC0D0).withOpacity(0.7),
+                      offset: const Offset(2, 2),
+                      blurRadius: 4,
                     ),
-                    maxLines: 1,
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.9),
+                      offset: const Offset(-2, -2),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(_getStatusIcon(status), size: 14, color: statusColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatStatus(status),
+                      style: GoogleFonts.poppins(
+                        color: statusColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                timeAgo,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: const Color(0xFF2B326B).withOpacity(0.6),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(
+                Icons.inventory_2_outlined, 
+                size: 20, 
+                color: const Color(0xFF2B326B).withOpacity(0.7),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  equipment?['name'] ?? 'Unknown Equipment',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF2B326B),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          if (equipment?['brand'] != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const SizedBox(width: 28),
+                Flexible( // 🔧 Prevent overflow
+                  child: Text(
+                    '${equipment['brand']} • ${equipment['qr_code'] ?? 'N/A'}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: const Color(0xFF2B326B).withOpacity(0.6),
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            if (equipment?['brand'] != null) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const SizedBox(width: 28),
-                  Text(
-                    '${equipment['brand']} • ${equipment['qr_code'] ?? 'N/A'}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.description_outlined, size: 18, color: Colors.grey[600]),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      issue['description'] ?? 'No description provided',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey[800],
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          ],
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE6E8F0),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                // 🎨 Inner neumorphic effect for description
+                BoxShadow(
+                  color: Color(0xFFBCC0D0),
+                  offset: Offset(3, 3),
+                  blurRadius: 6,
+                ),
+                BoxShadow(
+                  color: Colors.white,
+                  offset: Offset(-3, -3),
+                  blurRadius: 6,
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.person_outline, size: 18, color: Colors.grey[600]),
+                Icon(
+                  Icons.description_outlined, 
+                  size: 18, 
+                  color: const Color(0xFF2B326B).withOpacity(0.7),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Reported by: ${reporter?['first_name'] ?? ''} ${reporter?['last_name'] ?? ''}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Email: ${reporter?['email'] ?? 'N/A'}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    issue['description'] ?? 'No description provided',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: const Color(0xFF2B326B).withOpacity(0.8),
+                      height: 1.4,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (status != 'resolved')
-                  TextButton.icon(
-                    onPressed: () => _showStatusDialog(issue),
-                    icon: const Icon(Icons.edit_outlined, size: 16),
-                    label: const Text('Update Status'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF2B326B),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.person_outline, 
+                size: 18, 
+                color: const Color(0xFF2B326B).withOpacity(0.7),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Reported by: ${reporter?['first_name'] ?? ''} ${reporter?['last_name'] ?? ''}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: const Color(0xFF2B326B).withOpacity(0.8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis, // 🔧 Prevent overflow
                     ),
-                  ),
-                OutlinedButton.icon(
-                  onPressed: () => _showIssueDetails(issue),
-                  icon: const Icon(Icons.visibility_outlined, size: 16),
-                  label: const Text('View Details'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2B326B),
-                    side: const BorderSide(color: Color(0xFF2B326B)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Email: ${reporter?['email'] ?? 'N/A'}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: const Color(0xFF2B326B).withOpacity(0.6),
+                      ),
+                      overflow: TextOverflow.ellipsis, // 🔧 Prevent overflow
+                    ),
+                  ],
                 ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (status != 'resolved')
+                _buildNeumorphicButton(
+                  onPressed: () => _showStatusDialog(issue),
+                  icon: Icons.edit_outlined,
+                  label: 'Update Status',
+                  isOutlined: false,
+                ),
+              _buildNeumorphicButton(
+                onPressed: () => _showIssueDetails(issue),
+                icon: Icons.visibility_outlined,
+                label: 'View Details',
+                isOutlined: true,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNeumorphicButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    required bool isOutlined,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE6E8F0),
+          borderRadius: BorderRadius.circular(8),
+          border: isOutlined 
+              ? Border.all(color: const Color(0xFF2B326B), width: 1)
+              : null,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0xFFBCC0D0),
+              offset: Offset(2, 2),
+              blurRadius: 4,
+            ),
+            BoxShadow(
+              color: Colors.white,
+              offset: Offset(-2, -2),
+              blurRadius: 4,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: const Color(0xFF2B326B),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                color: const Color(0xFF2B326B),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -392,13 +664,26 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: const Color(0xFFE6E8F0), // 🎨 Neumorphic background
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF2B326B).withOpacity(0.1),
+                color: const Color(0xFFE6E8F0),
                 borderRadius: BorderRadius.circular(8),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0xFFBCC0D0),
+                    offset: Offset(3, 3),
+                    blurRadius: 6,
+                  ),
+                  BoxShadow(
+                    color: Colors.white,
+                    offset: Offset(-3, -3),
+                    blurRadius: 6,
+                  ),
+                ],
               ),
               child: const Icon(
                 Icons.sync_alt,
@@ -413,6 +698,7 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
+                  color: const Color(0xFF2B326B),
                 ),
               ),
             ),
@@ -426,7 +712,7 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
               'Select new status for this issue:',
               style: GoogleFonts.poppins(
                 fontSize: 13,
-                color: Colors.grey[600],
+                color: const Color(0xFF2B326B).withOpacity(0.7),
               ),
             ),
             const SizedBox(height: 16),
@@ -442,7 +728,9 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: GoogleFonts.poppins(color: Colors.grey[600]),
+              style: GoogleFonts.poppins(
+                color: const Color(0xFF2B326B).withOpacity(0.6),
+              ),
             ),
           ),
         ],
@@ -461,14 +749,29 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        color: isCurrentStatus ? Colors.grey[50] : null,
+        decoration: BoxDecoration(
+          color: isCurrentStatus ? const Color(0xFFE6E8F0) : null,
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
+                color: const Color(0xFFE6E8F0),
                 borderRadius: BorderRadius.circular(8),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0xFFBCC0D0),
+                    offset: Offset(2, 2),
+                    blurRadius: 4,
+                  ),
+                  BoxShadow(
+                    color: Colors.white,
+                    offset: Offset(-2, -2),
+                    blurRadius: 4,
+                  ),
+                ],
               ),
               child: Icon(
                 _getStatusIcon(status),
@@ -486,7 +789,9 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
-                      color: isCurrentStatus ? Colors.grey[500] : Colors.grey[800],
+                      color: isCurrentStatus 
+                          ? const Color(0xFF2B326B).withOpacity(0.5) 
+                          : const Color(0xFF2B326B),
                     ),
                   ),
                   if (isCurrentStatus)
@@ -494,7 +799,7 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
                       'Current status',
                       style: GoogleFonts.poppins(
                         fontSize: 11,
-                        color: Colors.grey[500],
+                        color: const Color(0xFF2B326B).withOpacity(0.5),
                       ),
                     ),
                 ],
@@ -548,6 +853,7 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
       context: context,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: const Color(0xFFE6E8F0), // 🎨 Neumorphic background
         child: Container(
           constraints: const BoxConstraints(maxWidth: 500),
           padding: const EdgeInsets.all(24),
@@ -558,7 +864,30 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.report_problem_outlined, color: Colors.red, size: 32),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE6E8F0),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0xFFBCC0D0),
+                            offset: Offset(3, 3),
+                            blurRadius: 6,
+                          ),
+                          BoxShadow(
+                            color: Colors.white,
+                            offset: Offset(-3, -3),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.report_problem_outlined, 
+                        color: Colors.red, 
+                        size: 32,
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -566,12 +895,16 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
                         style: GoogleFonts.poppins(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
+                          color: const Color(0xFF2B326B),
                         ),
                       ),
                     ),
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Color(0xFF2B326B),
+                      ),
                     ),
                   ],
                 ),
@@ -592,7 +925,7 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
+                    color: const Color(0xFF2B326B),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -600,14 +933,26 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: const Color(0xFFE6E8F0),
                     borderRadius: BorderRadius.circular(8),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0xFFBCC0D0),
+                        offset: Offset(3, 3),
+                        blurRadius: 6,
+                      ),
+                      BoxShadow(
+                        color: Colors.white,
+                        offset: Offset(-3, -3),
+                        blurRadius: 6,
+                      ),
+                    ],
                   ),
                   child: Text(
                     issue['description'] ?? 'No description provided',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
-                      color: Colors.grey[800],
+                      color: const Color(0xFF2B326B).withOpacity(0.8),
                       height: 1.5,
                     ),
                   ),
@@ -633,7 +978,7 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
+                color: const Color(0xFF2B326B),
               ),
             ),
           ),
@@ -642,8 +987,10 @@ Future<List<Map<String, dynamic>>> _fetchIssues() async {
               value,
               style: GoogleFonts.poppins(
                 fontSize: 14,
-                color: Colors.grey[800],
+                color: const Color(0xFF2B326B).withOpacity(0.8),
               ),
+              overflow: TextOverflow.ellipsis, // 🔧 Prevent overflow
+              maxLines: 2,
             ),
           ),
         ],

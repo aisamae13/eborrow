@@ -30,7 +30,8 @@ class _BorrowRequestPageState extends State<BorrowRequestPage> {
   void initState() {
     super.initState();
     _borrowDate = DateTime.now();
-    _returnDate = _borrowDate.add(const Duration(hours: 2));
+    // Remove default 2-hour duration - let user choose
+    _returnDate = _borrowDate.add(const Duration(minutes: 30)); // Start with 30 minutes as a reasonable default
     _checkStudentId();
   }
 
@@ -96,6 +97,27 @@ class _BorrowRequestPageState extends State<BorrowRequestPage> {
     }
   }
 
+  // Add validation method for duration
+  bool _isValidDuration() {
+    final duration = _returnDate.difference(_borrowDate);
+    final minDuration = const Duration(minutes: 10);
+    final maxDuration = const Duration(hours: 4);
+    
+    return duration >= minDuration && duration <= maxDuration;
+  }
+
+  // Add helper method to format duration
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    } else {
+      return '${minutes}m';
+    }
+  }
+
   Future<void> _selectTime(BuildContext context, bool isBorrowDate) async {
     final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
@@ -142,24 +164,57 @@ class _BorrowRequestPageState extends State<BorrowRequestPage> {
               pickedTime.hour,
               pickedTime.minute,
             );
-            if (_returnDate.isBefore(_borrowDate)) {
-              _returnDate = _borrowDate.add(const Duration(hours: 2));
-            }
+            // Don't auto-adjust return date anymore
+            // User needs to set their own duration
           } else {
-            _returnDate = DateTime(
+            final newReturnDate = DateTime(
               _returnDate.year,
               _returnDate.month,
               _returnDate.day,
               pickedTime.hour,
               pickedTime.minute,
             );
+            
+            // Validate duration constraints
+            final duration = newReturnDate.difference(_borrowDate);
+            
+            if (duration.inMinutes < 10) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Minimum borrow duration is 10 minutes.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              return;
+            }
+            
+            if (duration.inHours > 4) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Maximum borrow duration is 4 hours.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              return;
+            }
+            
+            if (newReturnDate.isBefore(_borrowDate)) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Return time must be after borrow time.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              return;
+            }
+            
+            _returnDate = newReturnDate;
           }
         });
       }
     }
   }
 
-  // PASTE THE NEW FUNCTION HERE
   Future<void> _confirmAndSubmitRequest() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -197,6 +252,31 @@ class _BorrowRequestPageState extends State<BorrowRequestPage> {
 
   Future<void> _submitBorrowRequest() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    // Add duration validation before submission
+    if (!_isValidDuration()) {
+      if (mounted) {
+        final duration = _returnDate.difference(_borrowDate);
+        String message;
+        
+        if (duration.inMinutes < 10) {
+          message = 'Minimum borrow duration is 10 minutes. Current duration: ${_formatDuration(duration)}';
+        } else if (duration.inHours > 4) {
+          message = 'Maximum borrow duration is 4 hours. Current duration: ${_formatDuration(duration)}';
+        } else {
+          message = 'Invalid borrow duration: ${_formatDuration(duration)}';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
       return;
     }
 

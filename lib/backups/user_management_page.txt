@@ -18,7 +18,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   int _refreshKey = 0;
-
+  
   // Add this map to track real-time user states
   Map<String, Map<String, dynamic>> _userStateOverrides = {};
 
@@ -62,9 +62,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   List<Map<String, dynamic>> _filterAndSortUsers(
-      List<Map<String, dynamic>> users,
-      String currentUserId,
-      ) {
+    List<Map<String, dynamic>> users,
+    String currentUserId,
+  ) {
     var filteredUsers = users.where((user) {
       final userIdFromDb = user['id'] as String;
       if (userIdFromDb == currentUserId) return false;
@@ -124,7 +124,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     final currentUserId = currentUser.id;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFE6E8F0), // Neumorphic background color
       appBar: AppBar(
         title: Text(
           'Borrower Management',
@@ -162,14 +161,14 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 prefixIcon: const Icon(Icons.search, color: Colors.white),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                  icon: const Icon(Icons.clear, color: Colors.white),
-                  onPressed: () {
-                    setState(() {
-                      _searchController.clear();
-                      _searchQuery = '';
-                    });
-                  },
-                )
+                        icon: const Icon(Icons.clear, color: Colors.white),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      )
                     : null,
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.2),
@@ -277,7 +276,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE6E8F0), // Neumorphic container color
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isSuspended
@@ -290,16 +289,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                               color: Colors.black.withOpacity(0.05),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
-                            ),
-                            const BoxShadow( // Neumorphic shadow
-                              color: Color(0xFFBCC0D0),
-                              offset: Offset(3, 3),
-                              blurRadius: 6,
-                            ),
-                            const BoxShadow( // Neumorphic highlight
-                              color: Colors.white,
-                              offset: Offset(-3, -3),
-                              blurRadius: 6,
                             ),
                           ],
                         ),
@@ -321,13 +310,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                                         : null,
                                     child: avatarUrl == null || avatarUrl.isEmpty
                                         ? Text(
-                                      initials,
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      ),
-                                    )
+                                            initials,
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18,
+                                            ),
+                                          )
                                         : null,
                                   ),
                                   const SizedBox(width: 12),
@@ -534,7 +523,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFFE6E8F0), // Neumorphic background color
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -570,10 +558,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               ),
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-
+                
                 // ✅ Update UI immediately
                 _removeUserLocally(userId);
-
+                
                 // Show immediate success message
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -584,7 +572,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     backgroundColor: Colors.green,
                   ),
                 );
-
+                
                 // Then perform the actual deletion
                 AdminService.deleteBorrowerAccount(userId).then((_) {
                   // If deletion fails, we could restore the user
@@ -620,7 +608,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFFE6E8F0), // Neumorphic background color
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -646,7 +633,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor:
-                currentlySuspended ? Colors.green : suspendedColor,
+                    currentlySuspended ? Colors.green : suspendedColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -657,10 +644,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               ),
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-
+                
                 // ✅ Update UI immediately
                 _updateUserStateLocally(userId, {'is_suspended': !currentlySuspended});
-
+                
                 // Show immediate success message
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -671,7 +658,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     backgroundColor: Colors.green,
                   ),
                 );
-
+                
                 // Then perform the actual action
                 AdminService.toggleSuspendUser(userId, !currentlySuspended).then((_) {
                   print('✅ User suspend/unsuspend completed successfully');
@@ -703,7 +690,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFFE6E8F0), // Neumorphic background color
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -739,7 +725,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               ),
               onPressed: () async {
                 Navigator.of(dialogContext).pop();
-
+                
                 // ✅ Show immediate success message
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -750,7 +736,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     backgroundColor: Colors.green,
                   ),
                 );
-
+                
                 try {
                   await supabase.auth.resetPasswordForEmail(email);
                   print('✅ Password reset email sent successfully');

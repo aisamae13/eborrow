@@ -57,15 +57,6 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
   }
 
   Future<void> _selectTime(BuildContext context) async {
-    // Calculate the maximum allowed time (4 hours from now)
-    final DateTime now = DateTime.now();
-    final DateTime maxTime = now.add(const Duration(hours: 4));
-    
-    // If the selected date is today, we need to check time restrictions
-    final bool isToday = _returnDate.year == now.year && 
-                         _returnDate.month == now.month && 
-                         _returnDate.day == now.day;
-
     final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_returnDate),
@@ -73,23 +64,18 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
         return Theme(
           data: Theme.of(context).copyWith(
             timePickerTheme: TimePickerThemeData(
-              // Change the background color of the AM/PM toggle
               dayPeriodColor: WidgetStateColor.resolveWith(
                 (states) => states.contains(WidgetState.selected)
-                    ? Color(0xFF2B326B) // Selected AM/PM background color
-                    : Colors.grey[200] ??
-                          Colors.grey, // Unselected AM/PM background color
+                    ? Color(0xFF2B326B)
+                    : Colors.grey[200] ?? Colors.grey,
               ),
-              // Change the text color of the AM/PM text
               dayPeriodTextColor: WidgetStateColor.resolveWith(
                 (states) => states.contains(WidgetState.selected)
-                    ? Colors
-                          .white // Selected AM/PM text color
-                    : Colors.black, // Unselected AM/PM text color
+                    ? Colors.white
+                    : Colors.black,
               ),
-              // You can also change the border color
               dayPeriodBorderSide: BorderSide(
-                color: Color(0xFF2B326B), // Border color
+                color: Color(0xFF2B326B),
               ),
             ),
           ),
@@ -107,49 +93,47 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
         pickedTime.minute,
       );
 
-      // Check if the selected time is within the 4-hour limit when it's today
-      if (isToday) {
-        if (newReturnDate.isAfter(maxTime)) {
-          // Show error if time exceeds 4-hour limit
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Return time cannot be more than 4 hours from now.\nMaximum time today: ${DateFormat('hh:mm a').format(maxTime)}',
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
+      // Calculate duration between borrow start (now) and return date
+      final DateTime now = DateTime.now();
+      final Duration duration = newReturnDate.difference(now);
+      
+      // Validate duration constraints (10 minutes to 4 hours)
+      if (duration.inMinutes < 10) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Minimum borrow duration is 10 minutes.\nCurrent duration: ${duration.inMinutes} minutes',
             ),
-          );
-          return; // Don't update the time
-        }
-        
-        // Check if the selected time is in the past
-        if (newReturnDate.isBefore(now.add(const Duration(minutes: 15)))) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Return time must be at least 15 minutes from now.',
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+      
+      if (duration.inHours > 4) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Maximum borrow duration is 4 hours.\nCurrent duration: ${duration.inHours}h ${duration.inMinutes.remainder(60)}m',
             ),
-          );
-          return; // Don't update the time
-        }
-      } else {
-        // For future dates, just check that it's not in the past
-        if (newReturnDate.isBefore(now)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Return time cannot be in the past.',
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-          return; // Don't update the time
-        }
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+
+      // Check if the selected time is in the past
+      if (newReturnDate.isBefore(now)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Return time cannot be in the past.'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        return;
       }
 
       // If all validations pass, update the return date
@@ -309,14 +293,14 @@ class _ModifyRequestPageState extends State<ModifyRequestPage> {
                             child: Row(
                               children: [
                                 Icon(
-                  Icons.info_outline,
+                                  Icons.info_outline,
                                   size: 16,
                                   color: Colors.blue[700],
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'Maximum borrow time: 4 hours from current time',
+                                    'Duration limits: 10 minutes minimum, 4 hours maximum',
                                     style: GoogleFonts.poppins(
                                       fontSize: 12,
                                       color: Colors.blue[700],

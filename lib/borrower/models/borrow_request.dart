@@ -13,7 +13,7 @@ class BorrowRequest {
   final DateTime createdAt;
   final int modificationCount;
   final String? rejectionReason;
-  final String? equipmentImageUrl; // ✅ Correct: Field is declared
+  final String? equipmentImageUrl;
 
   BorrowRequest({
     required this.requestId,
@@ -27,10 +27,9 @@ class BorrowRequest {
     required this.createdAt,
     required this.modificationCount,
     this.rejectionReason,
-    this.equipmentImageUrl, // ✅ FIX: Added to the constructor
+    this.equipmentImageUrl,
   });
 
-  // Consolidated Status Color Logic (remains correct)
   Color getStatusColor() {
     switch (status.toLowerCase()) {
       case 'active':
@@ -54,31 +53,32 @@ class BorrowRequest {
   }
 
   String get formattedStatus {
-    // If the DB status is 'rejected', return 'Rejected'
-    if (status.toLowerCase() == 'rejected') {
-        return 'Rejected';
-    }
-
+    if (status.toLowerCase() == 'rejected') return 'Rejected';
     if (status.isEmpty) return '';
     return status[0].toUpperCase() + status.substring(1).toLowerCase();
   }
 
   factory BorrowRequest.fromMap(Map<String, dynamic> map) {
-    // 💡 FIX: Define equipmentMap here to safely access nested fields
     final equipmentMap = map['equipment'] as Map<String, dynamic>?;
+
+    // IMPORTANT: normalize to local to avoid the ~7-8h drift
+    DateTime _toLocal(dynamic v) {
+      if (v == null) return DateTime.now();
+      // Supabase returns ISO strings; DateTime.parse handles offsets/UTC 'Z'
+      return DateTime.parse(v.toString()).toLocal();
+    }
 
     return BorrowRequest(
       requestId: map['request_id'],
       borrowerId: map['borrower_id'],
       equipmentId: map['equipment_id'],
-      // 💡 FIX: Use the defined equipmentMap for cleaner code
       equipmentName: equipmentMap?['name'] ?? 'Unknown Equipment',
-      equipmentImageUrl: equipmentMap?['image_url'] as String?, // ✅ Correct: equipmentMap is now in scope
-      borrowDate: DateTime.parse(map['borrow_date']),
-      returnDate: DateTime.parse(map['return_date']),
+      equipmentImageUrl: equipmentMap?['image_url'] as String?,
+      borrowDate: _toLocal(map['borrow_date']),
+      returnDate: _toLocal(map['return_date']),
       purpose: map['purpose'],
       status: map['status'],
-      createdAt: DateTime.parse(map['created_at']),
+      createdAt: _toLocal(map['created_at']),
       modificationCount: map['modification_count'] ?? 0,
       rejectionReason: map['rejection_reason'] as String?,
     );

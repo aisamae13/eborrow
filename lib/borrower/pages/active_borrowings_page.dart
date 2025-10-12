@@ -658,6 +658,7 @@ Widget _buildBorrowedItemCard(BorrowRequest item) {
                       BorrowCountdownTimer(
                         borrowDate: item.borrowDate,
                         returnDate: item.returnDate,
+                        status: item.status,
                         compact: false,
                         onFinished: () {
                           // Auto-refresh when countdown reaches zero (transitions from active to overdue)
@@ -789,7 +790,6 @@ Widget _buildBorrowedItemCard(BorrowRequest item) {
         return 'Pending';
       case 'approved':
         return 'Approved';
-      case 'active':
         return 'Active';
       case 'overdue':
         return 'Overdue';

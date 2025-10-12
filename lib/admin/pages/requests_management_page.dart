@@ -584,6 +584,7 @@ class RequestCard extends StatelessWidget {
             BorrowCountdownTimer(
               borrowDate: borrowDate,
               returnDate: returnDate,
+              status: status, // Pass the status parameter as required
               compact: false,
               onFinished: () {
                 // Only refresh if the current status is NOT already overdue

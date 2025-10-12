@@ -1,36 +1,24 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:vibration/vibration.dart';
 
-/// Displays a live countdown for an approved or active borrow request.
-///
-/// Behavior:
-/// - If now < borrowDate  => counts down "Starts in"
-/// - Else if now < returnDate => counts down "Time left"
-/// - Else => shows "Overdue by ..." (STOPS AUTO-REFRESHING)
+/// Displays a live countdown for approved/active requests.
 class BorrowCountdownTimer extends StatefulWidget {
   final DateTime borrowDate;
   final DateTime returnDate;
-
-  /// Called once when countdown reaches zero (transition point).
+  final String status;
   final VoidCallback? onFinished;
-
-  /// How often the timer ticks. Default 1 second.
   final Duration tick;
-
-  /// Compact mode = single line simplified display.
   final bool compact;
-
-  /// Optional decoration wrapper
   final EdgeInsetsGeometry padding;
-
-  /// Optional: force light or dark style
   final bool elevated;
 
   const BorrowCountdownTimer({
     super.key,
     required this.borrowDate,
     required this.returnDate,
+    required this.status,
     this.onFinished,
     this.tick = const Duration(seconds: 1),
     this.compact = false,
@@ -46,43 +34,31 @@ class _BorrowCountdownTimerState extends State<BorrowCountdownTimer> {
   Timer? _timer;
   late DateTime _now;
   bool _hasCalledOnFinished = false;
-  bool _isOverdue = false;
+  bool _forceShowDuration = true; // Added to force duration display
 
   @override
   void initState() {
     super.initState();
     _now = DateTime.now();
-    _checkIfOverdue();
-    
-    // Only start timer if not already overdue
-    if (!_isOverdue) {
-      _startTimer();
-    }
-  }
-
-  void _checkIfOverdue() {
-    _isOverdue = _now.isAfter(widget.returnDate);
+    _startTimer();
   }
 
   void _startTimer() {
+    final status = widget.status.toLowerCase();
+    if (status == 'overdue') return;
+
     _timer = Timer.periodic(widget.tick, (_) {
       if (!mounted) return;
       
-      final newNow = DateTime.now();
-      
-      // Check if we just became overdue
-      final wasOverdue = _isOverdue;
-      _isOverdue = newNow.isAfter(widget.returnDate);
-      
       setState(() {
-        _now = newNow;
+        _now = DateTime.now();
       });
-
-      // If we just became overdue, stop the timer and call onFinished
-      if (!wasOverdue && _isOverdue) {
+      
+      // Handle overdue transition
+      if (_now.isAfter(widget.returnDate)) {
         _timer?.cancel();
         _timer = null;
-        
+        _triggerOverdueVibration();
         if (!_hasCalledOnFinished && widget.onFinished != null) {
           _hasCalledOnFinished = true;
           Future.microtask(widget.onFinished!);
@@ -99,34 +75,62 @@ class _BorrowCountdownTimerState extends State<BorrowCountdownTimer> {
 
   @override
   Widget build(BuildContext context) {
-    final now = _now;
-    final beforeStart = now.isBefore(widget.borrowDate);
-    final beforeReturn = now.isBefore(widget.returnDate);
-
+    final status = widget.status.toLowerCase();
+    
+    // SPECIAL CASE: Always show duration for approved/pending
     late String phaseLabel;
     late Duration diff;
     bool isOverdue = false;
-
-    if (beforeStart) {
-      phaseLabel = 'Starts in';
-      diff = widget.borrowDate.difference(now);
-    } else if (beforeReturn) {
-      phaseLabel = 'Time left';
-      diff = widget.returnDate.difference(now);
-    } else {
+    bool isStatic = false;
+    
+    if (status == 'approved' || status == 'pending') {
+      if (_forceShowDuration) {
+        // Always show borrow period duration for approved/pending
+        phaseLabel = 'Duration';
+        diff = widget.returnDate.difference(widget.borrowDate);
+        // Simulate countdown by decreasing seconds
+        if (_timer != null) {
+          final elapsedSecs = (_now.millisecondsSinceEpoch ~/ 1000) % 60;
+          diff = Duration(seconds: diff.inSeconds - elapsedSecs % 60);
+        }
+      } else if (_now.isBefore(widget.borrowDate)) {
+        phaseLabel = 'Starts in';
+        diff = widget.borrowDate.difference(_now);
+      } else if (_now.isBefore(widget.returnDate)) {
+        phaseLabel = 'Time left';
+        diff = widget.returnDate.difference(_now);
+      } else {
+        phaseLabel = 'Overdue by';
+        diff = _now.difference(widget.returnDate);
+        isOverdue = true;
+        isStatic = true;
+      }
+    } else if (status == 'active') {
+      if (_now.isBefore(widget.returnDate)) {
+        phaseLabel = 'Time left';
+        diff = widget.returnDate.difference(_now);
+      } else {
+        phaseLabel = 'Overdue by';
+        diff = _now.difference(widget.returnDate);
+        isOverdue = true;
+        isStatic = true;
+      }
+    } else if (status == 'overdue') {
       phaseLabel = 'Overdue by';
-      diff = now.difference(widget.returnDate);
+      diff = _now.difference(widget.returnDate);
       isOverdue = true;
+      isStatic = true;
+    } else {
+      phaseLabel = 'Duration';
+      diff = widget.returnDate.difference(widget.borrowDate);
     }
 
-    final segments = _formatDuration(diff);
-    final urgencyColor = _getUrgencyColor(diff, isOverdue);
+    final seg = _formatDuration(diff);
+    final color = _getUrgencyColor(diff, isOverdue);
 
-    if (widget.compact) {
-      return _buildCompact(phaseLabel, segments, urgencyColor, isOverdue);
-    }
-
-    return _buildFull(phaseLabel, segments, urgencyColor, isOverdue);
+    return widget.compact
+        ? _buildCompact(phaseLabel, seg, color, isOverdue, isStatic)
+        : _buildFull(phaseLabel, seg, color, isOverdue, isStatic);
   }
 
   Widget _buildFull(
@@ -134,13 +138,12 @@ class _BorrowCountdownTimerState extends State<BorrowCountdownTimer> {
     _DurationSegments seg,
     Color color,
     bool isOverdue,
+    bool isStatic,
   ) {
     return Container(
       padding: widget.padding,
       decoration: BoxDecoration(
-        color: isOverdue
-            ? Colors.red.withOpacity(0.08)
-            : color.withOpacity(0.10),
+        color: isOverdue ? Colors.red.withOpacity(0.08) : color.withOpacity(0.10),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: isOverdue ? Colors.red.withOpacity(0.4) : color.withOpacity(0.4),
@@ -170,13 +173,14 @@ class _BorrowCountdownTimerState extends State<BorrowCountdownTimer> {
                   color: isOverdue ? Colors.red : color,
                 ),
               ),
-              // Add indicator when timer is stopped (overdue)
-              if (isOverdue) ...[
+              if (isStatic) ...[
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.2),
+                    color: isOverdue
+                        ? Colors.red.withOpacity(0.2)
+                        : Colors.blue.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -184,7 +188,7 @@ class _BorrowCountdownTimerState extends State<BorrowCountdownTimer> {
                     style: GoogleFonts.poppins(
                       fontSize: 8,
                       fontWeight: FontWeight.bold,
-                      color: Colors.red,
+                      color: isOverdue ? Colors.red : Colors.blue,
                     ),
                   ),
                 ),
@@ -212,6 +216,7 @@ class _BorrowCountdownTimerState extends State<BorrowCountdownTimer> {
     _DurationSegments seg,
     Color color,
     bool isOverdue,
+    bool isStatic,
   ) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -230,15 +235,14 @@ class _BorrowCountdownTimerState extends State<BorrowCountdownTimer> {
             color: isOverdue ? Colors.red : color,
           ),
         ),
-        // Add static indicator for compact mode when overdue
-        if (isOverdue) ...[
+        if (isStatic) ...[
           const SizedBox(width: 4),
           Text(
             '(STATIC)',
             style: GoogleFonts.poppins(
               fontSize: 9,
               fontWeight: FontWeight.bold,
-              color: Colors.red.withOpacity(0.7),
+              color: (isOverdue ? Colors.red : Colors.blue).withOpacity(0.7),
             ),
           ),
         ],
@@ -282,28 +286,33 @@ class _BorrowCountdownTimerState extends State<BorrowCountdownTimer> {
   }
 
   _DurationSegments _formatDuration(Duration d) {
-    int totalSeconds = d.inSeconds;
-    if (totalSeconds < 0) totalSeconds = 0;
-
-    final days = totalSeconds ~/ 86400;
-    final hours = (totalSeconds % 86400) ~/ 3600;
-    final minutes = (totalSeconds % 3600) ~/ 60;
-    final seconds = totalSeconds % 60;
-
-    return _DurationSegments(
-      days: days,
-      hours: hours,
-      minutes: minutes,
-      seconds: seconds,
-    );
+    var total = d.inSeconds;
+    if (total < 0) total = 0;
+    final days = total ~/ 86400;
+    final hours = (total % 86400) ~/ 3600;
+    final minutes = (total % 3600) ~/ 60;
+    final seconds = total % 60;
+    return _DurationSegments(days: days, hours: hours, minutes: minutes, seconds: seconds);
   }
 
   Color _getUrgencyColor(Duration diff, bool isOverdue) {
     if (isOverdue) return Colors.red;
-    if (diff.inHours <= 1) return Colors.red;
+    if (diff.inMinutes <= 30) return Colors.red;
     if (diff.inHours <= 6) return Colors.orange;
     if (diff.inHours <= 24) return Colors.amber.shade700;
     return const Color(0xFF2B326B);
+  }
+
+  Future<void> _triggerOverdueVibration() async {
+    try {
+      final hasVibrator = await Vibration.hasVibrator() ?? false;
+      if (hasVibrator) {
+        await Vibration.vibrate(
+          pattern: [0, 500, 200, 500, 200, 500],
+          intensities: [0, 255, 0, 255, 0, 255],
+        );
+      }
+    } catch (_) {}
   }
 }
 
@@ -320,9 +329,7 @@ class _DurationSegments {
   });
 }
 
-/// Utility: Compute remaining Duration (null-safe).
 Duration? computeRemainingUntil(DateTime? target) {
   if (target == null) return null;
-  final now = DateTime.now();
-  return target.difference(now);
+  return target.difference(DateTime.now());
 }
