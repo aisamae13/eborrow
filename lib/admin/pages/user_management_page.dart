@@ -534,20 +534,56 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFFE6E8F0), // Neumorphic background color
+          backgroundColor: const Color(0xFFE6E8F0),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          title: Text(
-            'Confirm Deletion',
-            style: GoogleFonts.poppins(
-              color: primaryAdminColor,
-              fontWeight: FontWeight.w600,
-            ),
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: deleteColor, size: 28),
+              const SizedBox(width: 12),
+              Text(
+                'Complete Deletion',
+                style: GoogleFonts.poppins(
+                  color: deleteColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                ),
+              ),
+            ],
           ),
-          content: Text(
-            'Are you sure you want to permanently delete this borrower account? This action cannot be undone.',
-            style: GoogleFonts.poppins(fontSize: 14),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This will permanently delete ALL borrower data:',
+                style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              _buildDeletionItem('• User profile and account'),
+              _buildDeletionItem('• All borrow requests and history'),
+              _buildDeletionItem('• All notifications'),
+              _buildDeletionItem('• All reminder and extension logs'),
+              _buildDeletionItem('• Authentication account'),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: deleteColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: deleteColor.withOpacity(0.3)),
+                ),
+                child: Text(
+                  '⚠️ This action cannot be undone. All data will be permanently lost.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: deleteColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
           ),
           actions: <Widget>[
             TextButton(
@@ -565,37 +601,46 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 ),
               ),
               child: Text(
-                'Delete',
-                style: GoogleFonts.poppins(color: Colors.white),
+                'Delete Everything',
+                style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600),
               ),
               onPressed: () {
                 Navigator.of(dialogContext).pop();
 
-                // ✅ Update UI immediately
+                // Update UI immediately
                 _removeUserLocally(userId);
 
                 // Show immediate success message
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      'User account deleted successfully.',
+                      'Complete user deletion in progress...',
                       style: GoogleFonts.poppins(),
                     ),
-                    backgroundColor: Colors.green,
+                    backgroundColor: Colors.orange,
                   ),
                 );
 
-                // Then perform the actual deletion
+                // Perform the actual complete deletion
                 AdminService.deleteBorrowerAccount(userId).then((_) {
-                  // If deletion fails, we could restore the user
-                  print('✅ User deletion completed successfully');
-                }).catchError((e) {
-                  // If deletion fails, show error and refresh to restore UI
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Failed to delete user: $e',
+                          'User and all associated data deleted successfully.',
+                          style: GoogleFonts.poppins(),
+                        ),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                  print('✅ Complete user deletion completed successfully');
+                }).catchError((e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Failed to delete user completely: $e',
                           style: GoogleFonts.poppins(),
                         ),
                         backgroundColor: Colors.red,
@@ -609,6 +654,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildDeletionItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Text(
+        text,
+        style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[700]),
+      ),
     );
   }
 

@@ -45,69 +45,32 @@ class AdminService {
     }
   }
 
-  /// Deletes a borrower account and logs the admin action
+  /// Completely deletes a borrower account and all associated data
   static Future<void> deleteBorrowerAccount(String userId) async {
     try {
-      // Get user details before deletion for logging purposes
-      final userDetailsResponse = await supabase
-          .from('user_profiles')
-          .select('first_name, last_name, email')
-          .eq('id', userId)
-          .maybeSingle(); // Use maybeSingle() instead of single()
+      debugPrint('🗑️ Starting complete deletion of user: $userId');
       
-      if (userDetailsResponse == null) {
-        throw 'User not found or already deleted';
-      }
+      // Call the database function that handles complete deletion
+      final response = await supabase.rpc('delete_borrower_completely', 
+        params: {'target_user_id': userId}
+      );
       
-      final firstName = userDetailsResponse['first_name'] as String? ?? '';
-      final lastName = userDetailsResponse['last_name'] as String? ?? '';
-      final email = userDetailsResponse['email'] as String? ?? '';
-      final fullName = '$firstName $lastName'.trim();
+      debugPrint('✅ Complete user deletion successful');
       
-      // Delete operations in the correct order (without transactions for now)
-      
-      // 1. Delete user's notifications
-      await supabase.from('notifications')
-          .delete()
-          .eq('user_id', userId);
-      
-      // 2. Cancel user's pending/approved borrow requests (use the correct syntax)
-      await supabase.from('borrow_requests')
-          .update({'status': 'cancelled'})
-          .eq('borrower_id', userId)
-          .inFilter('status', ['pending', 'approved']); // Fixed: use inFilter() instead of in_()
-      
-      // 3. Log the admin action BEFORE deleting the profile
-      await supabase.from('admin_activity_logs').insert({
-        'admin_id': supabase.auth.currentUser!.id,
-        'action_type': 'delete',
-        'target_user_id': userId,
-        'target_user_email': email,
-        'target_user_name': fullName,
-        'details': 'User account deleted by admin',
-        'metadata': {
-          'timestamp': DateTime.now().toIso8601String(),
-        }
-      });
-      
-      // 4. Delete user profile
-      await supabase.from('user_profiles')
-          .delete()
-          .eq('id', userId);
-      
-      // 5. Finally, delete the user from auth system (if using admin API)
+      // Optional: Try to delete from auth system using admin API if available
+      // This requires service_role key and should be done server-side in production
       try {
         await supabase.auth.admin.deleteUser(userId);
+        debugPrint('✅ User also deleted from auth system');
       } catch (e) {
-        debugPrint('Warning: Could not delete user from auth system: $e');
-        // Continue anyway as the profile is already deleted
+        debugPrint('⚠️ Warning: Could not delete user from auth system: $e');
+        debugPrint('   User profile and data deleted, but auth record may remain');
+        // Continue anyway as the main data is already deleted
       }
       
-      debugPrint('User account deleted successfully');
-      
     } catch (e) {
-      debugPrint('Error deleting user: $e');
-      throw 'Failed to delete user: $e';
+      debugPrint('❌ Error during complete user deletion: $e');
+      throw 'Failed to completely delete user: $e';
     }
   }
 
